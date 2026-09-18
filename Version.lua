@@ -56,7 +56,7 @@ end
 function Version:NotifyIfNeeded(version)
     if self.notified or not version or not isNewer(version, self:GetCurrent()) then return end
     self.notified = true
-    BKA:Print("Доступна новая версия " .. tostring(version) .. ". GitHub: " .. REPOSITORY .. "/releases/latest")
+    BKA:Print(BKA:L("UPDATE_AVAILABLE_FMT", tostring(version), REPOSITORY .. "/releases/latest"))
 end
 
 function Version:Broadcast()

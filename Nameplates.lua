@@ -93,7 +93,7 @@ end
 
 function Nameplates:PrintClickTargetingStatus()
     if not clickAPIAvailable() then
-        BKA:Print("plateclick: BFA nameplate click API unavailable")
+        BKA:Print(BKA:L("PLATE_API_UNAVAILABLE"))
         return
     end
     self:CaptureClickTargetingDefaults()
@@ -612,10 +612,10 @@ function Nameplates:Display(unit, spellID, label, severity, persistent, duration
     if not BKA.db or BKA.db.showNameplates == false then return end
     local overlay = self:GetOverlay(unit)
     if not overlay then return end
-    label = BKA:NormalizeAction(label, label)
-    label = string.gsub(label, "_", " ")
+    local action = BKA:NormalizeAction(label, label)
+    local displayLabel = BKA:LocalizeAction(action)
     local state = {
-        spellID = spellID, label = label, action = label,
+        spellID = spellID, label = displayLabel, action = action,
         ability = BKA:GetAbilityForUnitSpell(BKA:GetNPCID(UnitGUID(unit)), spellID),
         severity = severity or "LOW", persistent = persistent and true or false,
         controlAction = controlAction,
@@ -661,7 +661,7 @@ function Nameplates:ShowActive(cast, resolution, unit)
         return
     end
     local action = BKA:NormalizeAction(resolution.nameplateAction or resolution.action or "CAST", resolution.ability and resolution.ability.mechanic)
-    local label = string.gsub(action, "_", " ")
+    local label = BKA:LocalizeAction(action)
     local detail
     local frontalTracking = false
     if action == "FRONTAL" or action == "CLEAVE" then
@@ -672,11 +672,12 @@ function Nameplates:ShowActive(cast, resolution, unit)
             alertState = "ACTIVE",
         }
         local targetLabel = BKA:GetFrontalTargetLabel(resolution.ability, context)
-        if targetLabel then label = action .. " - " .. targetLabel end
-        detail = BKA:GetFrontalStateLabel(resolution.ability, context, true)
-        frontalTracking = detail == "TRACK"
+        if targetLabel then label = BKA:LocalizeAction(action) .. " - " .. BKA:LocalizeToken(targetLabel) end
+        local frontalState = BKA:GetFrontalStateLabel(resolution.ability, context, true)
+        frontalTracking = frontalState == "TRACK"
+        detail = BKA:LocalizeFrontalState(frontalState)
     elseif personal then
-        label = label .. " - YOU"
+        label = label .. " - " .. BKA:L("YOU")
     end
     overlay.activeState = {
         ability = resolution.ability, spellID = cast.spellID, texture = cast.texture,
@@ -715,13 +716,13 @@ function Nameplates:RestorePersistent(unit, skipAffixScan)
     local npcID = BKA:GetNPCID(UnitGUID(unit))
     local state
     if npcID == 141851 and BKA.Affixes:IsActive(16) and BKA.db.showInfestedAdds ~= false then
-        state = { label = "CC / STOP", action = "CC", severity = "CRITICAL", persistent = true }
+        state = { label = BKA:LocalizeAction("CC / STOP"), action = "CC", severity = "CRITICAL", persistent = true }
     elseif npcID == 120651 and BKA.Affixes:IsActive(13) then
-        state = { label = "ORB", action = "ORB", severity = "HIGH", persistent = true }
+        state = { label = BKA:LocalizeAction("ORB"), action = "ORB", severity = "HIGH", persistent = true }
     elseif not skipAffixScan then
         local marker, spellID = BKA.Affixes:GetNameplateMarker(unit)
         if marker then
-            state = { spellID = spellID, label = marker.label, action = marker.label, severity = marker.severity, persistent = true }
+            state = { spellID = spellID, label = BKA:LocalizeAction(marker.label), action = marker.label, severity = marker.severity, persistent = true }
         end
     end
     if state then state.priority = priority(state.action, state.severity, true) end

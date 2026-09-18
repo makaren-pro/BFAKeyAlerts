@@ -71,7 +71,7 @@ local function createRow(anchor, index)
     row.bar.youBadge.background:SetColorTexture(0.95, 0.04, 0.02, 0.95)
     row.bar.youBadge.text = row.bar.youBadge:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
     row.bar.youBadge.text:SetPoint("CENTER")
-    row.bar.youBadge.text:SetText("YOU")
+    row.bar.youBadge.text:SetText(BKA:L("YOU"))
     row.bar.youBadge.text:SetTextColor(1, 1, 0.2)
     row.bar.youBadge:Hide()
     row.bar.detail = row.bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -102,7 +102,7 @@ local function createRow(anchor, index)
     row.icon.action:SetPoint("BOTTOM", row.icon, "TOP", 0, 2)
     row.icon.youBadge = row.icon:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
     row.icon.youBadge:SetPoint("BOTTOM", row.icon.action, "TOP", 0, 1)
-    row.icon.youBadge:SetText("YOU")
+    row.icon.youBadge:SetText(BKA:L("YOU"))
     row.icon.youBadge:SetTextColor(1, 0.12, 0.05)
     row.icon.youBadge:Hide()
     row.icon.countdown = row.icon:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
@@ -133,7 +133,7 @@ function Alerts:Initialize()
     self.anchor.guide:Hide()
     self.anchor.guideText = self.anchor:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     self.anchor.guideText:SetPoint("BOTTOM", self.anchor, "TOP", 0, 18)
-    self.anchor.guideText:SetText("BFA Key Alerts - drag")
+    self.anchor.guideText:SetText("BFA Key Alerts - " .. BKA:L("DRAG"))
     self.anchor.guideText:SetTextColor(0.25, 0.78, 1)
     self.anchor.guideText:Hide()
     self.anchor:SetScript("OnDragStart", function(frame) frame:StartMoving() end)
@@ -251,7 +251,7 @@ function Alerts:ApplyPersonalStyle(row, personal, color)
 end
 
 function Alerts:ApplyPresentation(row, color)
-    local action = string.gsub(row.baseAction or "CAST", "_", " ")
+    local action = BKA:LocalizeAction(row.baseAction or "CAST")
     local state = row.alertState or "ACTIVE"
     local directional = row.baseAction == "FRONTAL" or row.baseAction == "CLEAVE"
     local directionalAction = row.baseAction == "CLEAVE" and "CLEAVE" or "FRONTAL"
@@ -266,27 +266,27 @@ function Alerts:ApplyPresentation(row, color)
     if directional and not BKA:IsTargetBasedFrontal(row.ability) then personal = false end
     if row.stackAmount then action = action .. " - x" .. tostring(row.stackAmount) end
 
-    local barDetail = row.spellName or ""
-    local iconDetail = row.spellName or ""
+    local barDetail = BKA:LocalizeDetail(row.spellName or "")
+    local iconDetail = BKA:LocalizeDetail(row.spellName or "")
     local frontalState
     if state == "PREWARN" then
-        action = directional and (directionalAction .. " SOON") or ("SOON - " .. action)
+        action = directional and BKA:L("ACTION_SOON_FMT", BKA:LocalizeAction(directionalAction)) or BKA:L("SOON_ACTION_FMT", action)
     elseif directional then
-        action = personal and ("YOU - " .. directionalAction) or directionalAction
+        action = personal and BKA:L("YOU_ACTION_FMT", BKA:LocalizeAction(directionalAction)) or BKA:LocalizeAction(directionalAction)
         local targetLabel = BKA:GetFrontalTargetLabel(row.ability, context)
         frontalState = BKA:GetFrontalStateLabel(row.ability, context)
         local metadata = {}
-        if targetLabel and targetLabel ~= "YOU" then metadata[#metadata + 1] = "-> " .. targetLabel end
-        if frontalState then metadata[#metadata + 1] = frontalState end
+        if targetLabel and targetLabel ~= "YOU" then metadata[#metadata + 1] = "-> " .. BKA:LocalizeToken(targetLabel) end
+        if frontalState then metadata[#metadata + 1] = BKA:LocalizeFrontalState(frontalState) end
         if #metadata > 0 then
             local compact = table.concat(metadata, "  -  ")
             barDetail = barDetail ~= "" and (barDetail .. "  -  " .. compact) or compact
             iconDetail = table.concat(metadata, " - ")
         end
     else
-        if personal and state == "ACTIVE" then action = "YOU - " .. action end
-        if row.targetName and row.targetName ~= "" then barDetail = barDetail .. "  -  " .. row.targetName end
-        if personal then iconDetail = row.spellName or "YOU" end
+        if personal and state == "ACTIVE" then action = BKA:L("YOU_ACTION_FMT", action) end
+        if row.targetName and row.targetName ~= "" then barDetail = barDetail .. "  -  " .. BKA:LocalizeDetail(row.targetName) end
+        if personal then iconDetail = BKA:LocalizeDetail(row.spellName or BKA:L("YOU")) end
     end
 
     row.bar.action:SetText(action)
@@ -415,7 +415,11 @@ function Alerts:Show(ability, context)
     local key = context.key or self:GetKey(ability, context)
     local row = self:Acquire(rank, key)
     if not row then return end
-    local spellName = context.spellName or GetSpellInfo(context.spellID or ability.id) or ("Spell " .. tostring(ability.id))
+    local spellName = context.spellName or GetSpellInfo(context.spellID or ability.id) or BKA:L("SPELL_FALLBACK", tostring(ability.id))
+    if context.preview and (context.spellID or ability.id) and (context.spellID or ability.id) > 0 then
+        spellName = GetSpellInfo(context.spellID or ability.id) or spellName
+    end
+    spellName = BKA:LocalizeDetail(spellName)
     local baseAction = normalizedAction
     local color = BKA.colors[ability.severity] or BKA.colors.LOW
     local texture = BKA:ResolveIcon(ability, context)

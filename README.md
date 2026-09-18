@@ -1,6 +1,6 @@
 # BFA Key Alerts
 
-Standalone Mythic+ alerts and UI for Battle for Azeroth 8.3 / Firestorm BFA.
+Standalone Mythic+ alerts and UI for Battle for Azeroth 8.3 / Firestorm BFA. Automatically localized for Russian and English clients.
 
 ## Features
 
@@ -10,6 +10,12 @@ Standalone Mythic+ alerts and UI for Battle for Azeroth 8.3 / Firestorm BFA.
 - Custom +3 / +2 / +1 keystone timer with forces, bosses, deaths and penalty
 - BFA Season 1 affix support, including Infested markers
 - Per-action sounds and movable UI
+
+## Localization
+
+- Russian client (`ruRU`): Russian UI and mechanic instructions.
+- English and other client locales: English UI and mechanic instructions.
+- Spell, affix, dungeon, and objective names are resolved through the WoW client API, so they follow the client's language automatically.
 
 ## Install
 

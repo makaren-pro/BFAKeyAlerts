@@ -2,7 +2,7 @@ local BKA = BFAKeyAlerts
 local Options = {}
 BKA.Options = Options
 
-local isRussian = GetLocale() == "ruRU"
+local isRussian = BKA.locale == "ruRU"
 local L = isRussian and {
     title = "BFA Key Alerts",
     rootDescription = "Настройки разделены по разделам. Выберите нужный пункт слева или откройте его кнопкой ниже.",
@@ -298,7 +298,7 @@ function Options:Initialize()
         check:SetPoint("TOPLEFT", x, y); check:SetSize(24, 24)
         check:SetScript("OnClick", function(button) BKA.db.soundActions[action] = button:GetChecked() and true or false end)
         self.soundChecks[action] = check
-        createButton(sounds, action, 142, x + 28, y, function() BKA.Sounds:Preview(action) end)
+        createButton(sounds, BKA:LocalizeAction(action), 142, x + 28, y, function() BKA.Sounds:Preview(action) end)
     end
     createButton(sounds, L.resetCombatSounds, 190, 18, -416, function() BKA.Sounds:ResetActions(); Options:Refresh() end)
     createButton(sounds, L.testAllSounds, 180, 218, -416, function() BKA.Sounds:PreviewAll() end)

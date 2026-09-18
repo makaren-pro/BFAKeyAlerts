@@ -2,11 +2,12 @@
 ## Title: BFA Key Alerts
 ## Notes: Standalone BFA Season 1 Mythic+ mechanic alerts
 ## Author: Kirill Petrasov
-## Version: 1.5.0
+## Version: 1.6.0
 ## X-Website: https://github.com/makaren-pro/BFAKeyAlerts
 ## SavedVariables: BFAKeyAlertsDB
 
 Core.lua
+Localization.lua
 Config.lua
 Version.lua
 HUD.lua

@@ -65,7 +65,7 @@ function Affixes:IsCursedPulse(spellID, spellName)
     if learned and learned > 0 then
         return spellID == learned
     end
-    if spellName == "Cursed Pulse" then
+    if BKA:IsSpellAlias("CURSED_PULSE", spellName) then
         self:LearnCursedPulse(spellID)
         return true
     end

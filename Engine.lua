@@ -200,17 +200,9 @@ function BKA:CompileDungeon(dungeon)
         end
     end
     local learned = self.db.firestorm.cursedPulseSpellID
-    if not learned then
-        for _, record in pairs(self.db.unknown or {}) do
-            if record.spellName == "Cursed Pulse" and record.spell and record.spell > 0 then
-                learned = record.spell
-                self.db.firestorm.cursedPulseSpellID = learned
-                break
-            end
-        end
-    end
     if learned and learned > 0 then
-        self.spellNameToID[GetSpellInfo(learned) or "Cursed Pulse"] = learned
+        local learnedName = GetSpellInfo(learned)
+        if learnedName then self.spellNameToID[learnedName] = learned end
     end
 end
 

@@ -381,13 +381,13 @@ function Tracker:CreateUtilitySlot(row, index)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:SetText(entry.name or "", 1, 1, 1)
         if entry.state == "ready" then
-            GameTooltip:AddLine("READY", READY[1], READY[2], READY[3])
+            GameTooltip:AddLine(BKA:L("READY"), READY[1], READY[2], READY[3])
         elseif entry.state == "cooldown" then
-            GameTooltip:AddLine("CD: " .. cooldownText(entry.remaining) .. "s", COOLDOWN[1], COOLDOWN[2], COOLDOWN[3])
+            GameTooltip:AddLine(BKA:L("COOLDOWN_FMT", cooldownText(entry.remaining)), COOLDOWN[1], COOLDOWN[2], COOLDOWN[3])
         elseif entry.state == "blocked" then
-            GameTooltip:AddLine("Недоступно", BLOCKED[1], BLOCKED[2], BLOCKED[3])
+            GameTooltip:AddLine(BKA:L("UNAVAILABLE"), BLOCKED[1], BLOCKED[2], BLOCKED[3])
         else
-            GameTooltip:AddLine("Готовность пока не подтверждена", UNKNOWN[1], UNKNOWN[2], UNKNOWN[3])
+            GameTooltip:AddLine(BKA:L("UNKNOWN_READY"), UNKNOWN[1], UNKNOWN[2], UNKNOWN[3])
         end
         GameTooltip:Show()
     end)
@@ -457,7 +457,7 @@ end
 function Tracker:CreateFrame()
     if self.frame then return self.frame end
     local settings = BKA.db.kickTracker
-    local f = BKA.HUD:CreatePanel("BFAKeyAlerts_GroupKicks", settings, "Group control", 350, -160)
+    local f = BKA.HUD:CreatePanel("BFAKeyAlerts_GroupKicks", settings, BKA:L("GROUP_CONTROL"), 350, -160)
     f:SetSize(settings.width or 320, 60)
     f:SetBackdropColor(0.012, 0.017, 0.025, 0.94)
     f:SetBackdropBorderColor(0.075, 0.095, 0.125, 0.94)
@@ -465,7 +465,7 @@ function Tracker:CreateFrame()
     f.rows = {}
 
     f.title = BKA.HUD:Text(f, 10, 10, -9, 180)
-    f.title:SetText("GROUP CONTROL")
+    f.title:SetText(BKA:L("GROUP_CONTROL_HEADER"))
     f.title:SetTextColor(0.76, 0.82, 0.89)
 
     f.summary = BKA.HUD:Text(f, 9, 0, 0, 150)
@@ -525,13 +525,13 @@ function Tracker:RenderPrimary(row, entry)
     row.bar:SetStatusBarColor(color[1], color[2], color[3], 0.90)
 
     if entry.state == "ready" then
-        row.state:SetText("READY")
+        row.state:SetText(BKA:L("READY"))
         row.icon:SetDesaturated(false); row.icon:SetAlpha(1)
     elseif entry.state == "cooldown" then
         row.state:SetText(cooldownText(remaining))
         row.icon:SetDesaturated(true); row.icon:SetAlpha(0.58)
     elseif entry.state == "blocked" then
-        row.state:SetText("DOWN")
+        row.state:SetText(BKA:L("DOWN"))
         row.icon:SetDesaturated(true); row.icon:SetAlpha(0.30)
         row.bar:SetValue(0)
     else
@@ -590,7 +590,7 @@ function Tracker:Refresh(force)
     end
 
     for i = rowIndex + 1, #frame.rows do frame.rows[i]:Hide() end
-    frame.summary:SetText(string.format("K %d/%d  |  CC %d", readyKicks, totalKicks, readyCC))
+    frame.summary:SetText(BKA:L("KICK_SUMMARY_FMT", readyKicks, totalKicks, readyCC))
     frame:SetHeight(math.max(50, 35 + rowIndex * 45))
     frame:Show()
 end

@@ -29,7 +29,7 @@ local function readRun()
 
     local level, affixes = C_ChallengeMode.GetActiveKeystoneInfo()
     local run = {
-        name = name or "Подземелье", limit = limit, elapsed = elapsed, level = level or 0,
+        name = name or BKA:L("DUNGEON"), limit = limit, elapsed = elapsed, level = level or 0,
         affixes = {}, bosses = {}, bossCount = 0, bossDone = 0,
     }
     for _, id in ipairs(affixes or {}) do
@@ -57,7 +57,7 @@ end
 function KeystoneHUD:CreateFrame()
     if self.frame then return self.frame end
     local settings = BKA.db.keystoneHUD
-    local f = BKA.HUD:CreatePanel("BFAKeyAlerts_KeystoneHUD", settings, "Таймер ключа", -350, 0)
+    local f = BKA.HUD:CreatePanel("BFAKeyAlerts_KeystoneHUD", settings, BKA:L("KEYSTONE_TIMER"), -350, 0)
     f:SetSize(292, 240)
     f.eyebrow = BKA.HUD:Text(f, 9, 12, -10, 268)
     f.title = BKA.HUD:Text(f, 14, 12, -24, 268)
@@ -161,10 +161,10 @@ function KeystoneHUD:Refresh(force)
 
     local f = self:CreateFrame()
     self:ApplySettings()
-    run = run or { name = "Таймер ключа", level = 0, limit = 1800, affixes = {}, bosses = {"Разблокировано - перетащи полоску сверху"}, bossCount = 0, bossDone = 0 }
-    f.eyebrow:SetText(preview and "MYTHIC+  /  НАСТРОЙКА ПОЗИЦИИ" or "MYTHIC+  /  КЛЮЧ +" .. run.level)
+    run = run or { name = BKA:L("KEYSTONE_TIMER"), level = 0, limit = 1800, affixes = {}, bosses = {BKA:L("KEY_PREVIEW_BOSS")}, bossCount = 0, bossDone = 0 }
+    f.eyebrow:SetText(preview and BKA:L("MYTHIC_SETUP") or BKA:L("MYTHIC_KEY_FMT", run.level))
     f.title:SetText(run.name)
-    f.affixes:SetText(#run.affixes > 0 and table.concat(run.affixes, "   ") or "Аффиксы появятся после запуска ключа")
+    f.affixes:SetText(#run.affixes > 0 and table.concat(run.affixes, "   ") or BKA:L("AFFIX_WAIT"))
 
     local timerY = -math.max(70, 45 + f.affixes:GetStringHeight() + 10)
     for i, tile in ipairs(f.timers) do
@@ -183,16 +183,16 @@ function KeystoneHUD:Refresh(force)
 
     local y = timerY - 50
     f.forces:ClearAllPoints(); f.forces:SetPoint("TOPLEFT", 12, y)
-    f.forces:SetText(run.forces and string.format("Силы %.1f%%  |  осталось %.1f%%", run.forces, math.max(0, 100 - run.forces)) or "СИЛЫ ПРОТИВНИКА   -")
+    f.forces:SetText(run.forces and BKA:L("FORCES_FMT", run.forces, math.max(0, 100 - run.forces)) or BKA:L("FORCES_EMPTY"))
     f.forcesBar:ClearAllPoints(); f.forcesBar:SetPoint("TOPLEFT", 12, y - 17)
     f.forcesBar:SetValue(math.max(0, math.min(100, run.forces or 0)))
     f.bossTitle:ClearAllPoints(); f.bossTitle:SetPoint("TOPLEFT", 12, y - 29)
-    f.bossTitle:SetText(string.format("БОССЫ   %d / %d   |   ОСТАЛОСЬ %d", run.bossDone, run.bossCount, run.bossCount - run.bossDone))
+    f.bossTitle:SetText(BKA:L("BOSSES_FMT", run.bossDone, run.bossCount, run.bossCount - run.bossDone))
     f.bosses:ClearAllPoints(); f.bosses:SetPoint("TOPLEFT", 12, y - 44)
-    f.bosses:SetText(#run.bosses > 0 and table.concat(run.bosses, "\n") or (run.bossCount > 0 and "Все боссы повержены" or "Ожидание целей подземелья..."))
+    f.bosses:SetText(#run.bosses > 0 and table.concat(run.bosses, "\n") or (run.bossCount > 0 and BKA:L("BOSSES_DONE") or BKA:L("WAIT_OBJECTIVES")))
     local footerY = y - 44 - f.bosses:GetStringHeight() - 10
     f.footer:ClearAllPoints(); f.footer:SetPoint("TOPLEFT", 12, footerY)
-    f.footer:SetText("Прошло " .. (run.elapsed and clock(run.elapsed) or "-:-") .. "   |   Смертей " .. (run.deaths or 0) .. "   |   Штраф " .. clock(run.penalty or 0))
+    f.footer:SetText(BKA:L("FOOTER_FMT", run.elapsed and clock(run.elapsed) or "-:-", run.deaths or 0, clock(run.penalty or 0)))
     f:SetHeight(-footerY + 22)
     f:Show()
 

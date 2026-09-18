@@ -73,29 +73,29 @@ end
 
 local function setBoolean(key, value, label)
     BKA.db[key] = value
-    BKA:Print(label .. (value and " ON" or " OFF"))
+    BKA:Print(label .. " " .. BKA:L(value and "ON" or "OFF"))
 end
 
 SLASH_BFAKEYALERTS1 = "/bka"
 SlashCmdList.BFAKEYALERTS = function(input)
     local command, argument = string.match(string.lower(input or ""), "^%s*(%S*)%s*(.-)%s*$")
     if command == "on" then
-        setBoolean("enabled", true, "addon")
+        setBoolean("enabled", true, BKA:L("ADDON"))
         BKA:RefreshActivation()
         if BKA.Nameplates and BKA.Nameplates.RefreshClickTargeting then BKA.Nameplates:RefreshClickTargeting() end
         if BKA.GroupInterrupts then BKA.GroupInterrupts:Refresh(true) end
         if BKA.KeystoneHUD then BKA.KeystoneHUD:Refresh(true) end
     elseif command == "off" then
-        setBoolean("enabled", false, "addon")
+        setBoolean("enabled", false, BKA:L("ADDON"))
         BKA:RefreshActivation()
         if BKA.Nameplates and BKA.Nameplates.RefreshClickTargeting then BKA.Nameplates:RefreshClickTargeting() end
         if BKA.GroupInterrupts then BKA.GroupInterrupts:Refresh(true) end
         if BKA.KeystoneHUD then BKA.KeystoneHUD:Refresh(true) end
     elseif command == "alerts" and (argument == "on" or argument == "off") then
-        setBoolean("showAlerts", argument == "on", "center alerts")
+        setBoolean("showAlerts", argument == "on", BKA:L("CENTER_ALERTS"))
         if argument == "off" and BKA.Alerts then BKA.Alerts:Clear() end
     elseif command == "plates" and (argument == "on" or argument == "off") then
-        setBoolean("showNameplates", argument == "on", "nameplates")
+        setBoolean("showNameplates", argument == "on", BKA:L("NAMEPLATES"))
         if BKA.Nameplates then
             if argument == "off" then BKA.Nameplates:Clear() else BKA.Nameplates:RefreshAll() end
             BKA.Nameplates:RefreshClickTargeting()
@@ -103,17 +103,17 @@ SlashCmdList.BFAKEYALERTS = function(input)
     elseif command == "kicks" and (argument == "on" or argument == "off") then
         BKA.db.kickTracker.shown = argument == "on"
         if BKA.GroupInterrupts then BKA.GroupInterrupts:Refresh(true) end
-        BKA:Print("group kicks " .. string.upper(argument))
+        BKA:Print(BKA:L("GROUP_KICKS") .. " " .. BKA:L(argument == "on" and "ON" or "OFF"))
     elseif command == "keytimer" and (argument == "on" or argument == "off") then
         BKA.db.keystoneHUD.shown = argument == "on"
         if BKA.KeystoneHUD then BKA.KeystoneHUD:Refresh(true) end
-        BKA:Print("key timer " .. string.upper(argument))
+        BKA:Print(BKA:L("KEYSTONE_TIMER") .. " " .. BKA:L(argument == "on" and "ON" or "OFF"))
     elseif command == "sound" and (argument == "on" or argument == "off") then
-        setBoolean("sound", argument == "on", "sound")
+        setBoolean("sound", argument == "on", BKA:L("SOUND"))
     elseif command == "frontal" and (argument == "on" or argument == "off") then
-        setBoolean("showFrontalTarget", argument == "on", "frontal target details")
+        setBoolean("showFrontalTarget", argument == "on", BKA:L("FRONTAL_DETAILS"))
     elseif command == "plateclick" and (argument == "on" or argument == "off") then
-        setBoolean("clickableNameplateAlerts", argument == "on", "clickable nameplate alerts")
+        setBoolean("clickableNameplateAlerts", argument == "on", BKA:L("CLICKABLE_NAMEPLATES"))
         if BKA.Nameplates and BKA.Nameplates.RefreshClickTargeting then
             BKA.Nameplates:RefreshClickTargeting()
         end
@@ -138,12 +138,12 @@ SlashCmdList.BFAKEYALERTS = function(input)
     elseif command == "soundreset" then
         BKA.Sounds:ResetActions()
         if BKA.Options and BKA.Options.Refresh then BKA.Options:Refresh() end
-        BKA:Print("combat sound actions reset to ON")
+        BKA:Print(BKA:L("SOUND_RESET_DONE"))
     elseif command == "unlock" then
         BKA.Alerts:SetUnlocked(true)
     elseif command == "lock" then
         BKA.Alerts:SetUnlocked(false)
     else
-        BKA:Print("/bka config, alerts on|off, plates on|off, kicks on|off, keytimer on|off, frontal on|off, plateclick on|off|status, soundpreview <name|all|keyupgrade>, soundreset, unlock, lock, on|off, sound on|off")
+        BKA:Print(BKA:L("SLASH_HELP"))
     end
 end
