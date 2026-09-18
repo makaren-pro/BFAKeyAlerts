@@ -98,10 +98,11 @@ function Nameplates:PrintClickTargetingStatus()
     end
     self:CaptureClickTargetingDefaults()
     local left, right, top, bottom = C_NamePlate.GetNamePlateEnemyPreferredClickInsets()
-    BKA:Print("plateclick: enabled=" .. tostring(BKA.db and BKA.db.clickableNameplateAlerts ~= false) ..
-        ", applied=" .. tostring(self.clickTargetingApplied == true) ..
-        ", clickThrough=" .. tostring(C_NamePlate.GetNamePlateEnemyClickThrough()) ..
-        ", insets=" .. string.format("%.1f/%.1f/%.1f/%.1f", tonumber(left) or 0, tonumber(right) or 0, tonumber(top) or 0, tonumber(bottom) or 0))
+    BKA:Print(BKA:L("PLATE_STATUS_FMT",
+        tostring(BKA.db and BKA.db.clickableNameplateAlerts ~= false),
+        tostring(self.clickTargetingApplied == true),
+        tostring(C_NamePlate.GetNamePlateEnemyClickThrough()),
+        string.format("%.1f/%.1f/%.1f/%.1f", tonumber(left) or 0, tonumber(right) or 0, tonumber(top) or 0, tonumber(bottom) or 0)))
 end
 
 local function priority(action, severity, persistent)

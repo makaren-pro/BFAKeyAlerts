@@ -49,6 +49,8 @@ local EN = {
     SOUND_RESET_DONE = "Combat sound actions reset to ON",
     SLASH_HELP = "/bka config, alerts on|off, plates on|off, kicks on|off, keytimer on|off, frontal on|off, plateclick on|off|status, soundpreview <name|all|keyupgrade>, soundreset, unlock, lock, on|off, sound on|off",
     PLATE_API_UNAVAILABLE = "plateclick: BFA nameplate click API unavailable",
+    PLATE_STATUS_FMT = "plateclick: enabled=%s, applied=%s, clickThrough=%s, insets=%s",
+    SOUND_PREVIEW_LIST_FMT = "soundpreview: %s",
     REMAINING = "remaining",
 }
 
@@ -98,6 +100,8 @@ local RU = {
     SOUND_RESET_DONE = "Боевые звуки сброшены и включены",
     SLASH_HELP = "/bka config, alerts on|off, plates on|off, kicks on|off, keytimer on|off, frontal on|off, plateclick on|off|status, soundpreview <name|all|keyupgrade>, soundreset, unlock, lock, on|off, sound on|off",
     PLATE_API_UNAVAILABLE = "plateclick: API клика по неймплейтам BFA недоступен",
+    PLATE_STATUS_FMT = "plateclick: включено=%s, применено=%s, сквозной клик=%s, границы=%s",
+    SOUND_PREVIEW_LIST_FMT = "soundpreview: %s",
     REMAINING = "осталось",
 }
 
@@ -147,6 +151,10 @@ local RU_ACTIONS = {
     ["ORB"] = "СФЕРА",
     ["INFO"] = "ИНФО",
     ["WATCH"] = "СЛЕДИ",
+    ["INTERRUPT"] = "КИК",
+    ["TANK"] = "ТАНК",
+    ["YOU"] = "ТЫ",
+    ["NONE"] = "",
     ["BURSTING"] = "ВЗРЫВНОЙ",
     ["STAGE"] = "ЭТАП",
     ["STAGE 2"] = "ЭТАП 2",
@@ -181,7 +189,7 @@ local RU_ACTIONS = {
     ["SWAP - SHIELDED BOSS"] = "СМЕНИ ЦЕЛЬ - БОСС ПОД ЩИТОМ",
     ["SPREAD - 8Y"] = "РАЗОЙДИСЬ - 8 М",
     ["PUNT - BOMBS"] = "ОТКИНЬ - БОМБЫ",
-    ["CC - EARTHRAGER"] = "КОНТРОЛЬ - EARTHRAGER",
+    ["CC - EARTHRAGER"] = "КОНТРОЛЬ - АДД",
     ["KILL - INFUSED ADD"] = "УБЕЙ - УСИЛЕННЫЙ АДД",
     ["DEFENSIVE - FIRE ROUNDS"] = "СЕЙВ - ОГНЕННЫЕ ПАТРОНЫ",
     ["MOVE - KNOCKBACK ROUNDS"] = "ВЫЙДИ - ОТБРАСЫВАЮЩИЕ ПАТРОНЫ",
@@ -211,7 +219,12 @@ function BKA:LocalizeAction(action)
     key = string.gsub(key, "%s+", " ")
     key = string.gsub(key, "^%s+", "")
     key = string.gsub(key, "%s+$", "")
-    if self.locale == "ruRU" then return RU_ACTIONS[key] or key end
+    if self.locale == "ruRU" then
+        if RU_ACTIONS[key] then return RU_ACTIONS[key] end
+        local stage = string.match(key, "^STAGE%s+(%d+)$")
+        if stage then return "ЭТАП " .. stage end
+        return key
+    end
     if key == "GTFO" then return "MOVE" end
     return key
 end
@@ -247,6 +260,9 @@ local RU_DETAILS = {
     ["Plague Doctor"] = "Чумной доктор",
     ["Demolishing Terror"] = "Разрушительный ужас",
     ["Hoodoo Hexer"] = "Колдун худу",
+    ["Reban soon"] = "Скоро Reban",
+    ["T'zala soon"] = "Скоро T'zala",
+    ["SPEARS SOON"] = "СКОРО КОПЬЯ",
     ["OVER"] = "ЗАКОНЧИЛОСЬ",
     ["SPAWNED"] = "ПОЯВИЛСЯ",
 }

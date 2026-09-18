@@ -133,7 +133,11 @@ SlashCmdList.BFAKEYALERTS = function(input)
         elseif BKA.Sounds:Normalize(argument) then
             BKA.Sounds:Preview(argument)
         else
-            BKA:Print("soundpreview: " .. table.concat(BKA.Sounds:GetActions(), ", "))
+            local labels = {}
+            for _, action in ipairs(BKA.Sounds:GetActions()) do
+                labels[#labels + 1] = BKA:LocalizeAction(action)
+            end
+            BKA:Print(BKA:L("SOUND_PREVIEW_LIST_FMT", table.concat(labels, ", ")))
         end
     elseif command == "soundreset" then
         BKA.Sounds:ResetActions()
