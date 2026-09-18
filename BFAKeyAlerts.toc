@@ -1,0 +1,40 @@
+## Interface: 80300
+## Title: BFA Key Alerts
+## Notes: Standalone BFA Season 1 Mythic+ mechanic alerts
+## Author: Kirill Petrasov
+## Version: 1.5.0
+## X-Website: https://github.com/makaren-pro/BFAKeyAlerts
+## SavedVariables: BFAKeyAlertsDB
+
+Core.lua
+Config.lua
+Version.lua
+HUD.lua
+GroupInterrupts.lua
+KeystoneHUD.lua
+InterruptPolicies.lua
+GeometryPolicies.lua
+Sounds.lua
+Alerts.lua
+Stacks.lua
+Options.lua
+Timers.lua
+Targets.lua
+Logger.lua
+ActiveCasts.lua
+Nameplates.lua
+Affixes.lua
+SpecialHandlers.lua
+
+Data/AtalDazar.lua
+Data/Freehold.lua
+Data/KingsRest.lua
+Data/ShrineOfTheStorm.lua
+Data/SiegeOfBoralus.lua
+Data/TempleOfSethraliss.lua
+Data/TheMotherlode.lua
+Data/TolDagor.lua
+Data/Underrot.lua
+Data/WaycrestManor.lua
+
+Engine.lua
