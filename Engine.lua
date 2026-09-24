@@ -383,6 +383,7 @@ function BKA:Activate(dungeon)
     self.active = true
     self.activeDungeon = dungeon
     self:CompileDungeon(dungeon)
+    self.CastLearning:BuildAllowed(dungeon)
     self:BuildPartyGUIDs()
     self.Targets:RefreshBossUnits()
     self:RegisterHotEvents(dungeon)
@@ -394,6 +395,7 @@ function BKA:Deactivate()
         return
     end
     self.active = false
+    self.CastLearning:ResetRuntime()
     self:UnregisterHotEvents()
     self.Alerts:Clear()
     self.Timers:Clear()
@@ -646,7 +648,9 @@ function BKA:DispatchAbility(ability, context)
 end
 
 function BKA:HandleCombatLog()
-    local timestamp, event, _, sourceGUID, sourceName, sourceFlags, _, destGUID, destName, _, _, arg12, arg13, arg14, arg15, arg16, arg17, arg18, arg19, arg20, arg21, arg22 = CombatLogGetCurrentEventInfo()
+    local timestamp, event, _, sourceGUID, sourceName, sourceFlags, _, destGUID, destName, destFlags, _, arg12, arg13, arg14, arg15, arg16, arg17, arg18, arg19, arg20, arg21, arg22 = CombatLogGetCurrentEventInfo()
+    self.CastLearning:OnCombatLog(event, sourceGUID, sourceFlags, destGUID, destFlags,
+        type(arg12) == "number" and arg12 or nil, event == "SPELL_INTERRUPT" and arg15 or nil)
     if event == "UNIT_DIED" then
         self.Timers:CancelSource(destGUID)
         self.ActiveCasts:StopSource(destGUID)
@@ -764,6 +768,7 @@ function BKA:OnEvent(event, ...)
         return
     elseif event == "PLAYER_ENTERING_WORLD" then
         self:ResetCompletionSound()
+        self.CastLearning:ResetRuntime()
         if self.db then
             C_Timer.After(0.5, function()
                 if BKA.Nameplates and BKA.Nameplates.RefreshClickTargeting then

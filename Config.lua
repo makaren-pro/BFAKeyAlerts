@@ -38,6 +38,11 @@ BKA.defaults = {
         width = 370,
     },
     firestorm = {},
+    castLearning = {
+        version = 1, enabled = true, predictions = true, importantOnly = true,
+        leadTime = 1.0, minimumSamples = 5, minimumConfidence = 0.85,
+        debug = false,
+    },
 }
 
 function BKA:InitDB()
@@ -65,6 +70,13 @@ function BKA:InitDB()
         for key, value in pairs(self.defaults[tableKey]) do
             if self.db[tableKey][key] == nil then self.db[tableKey][key] = value end
         end
+    end
+    if type(self.db.castLearning) ~= "table" then self.db.castLearning = {} end
+    for key, value in pairs(self.defaults.castLearning) do
+        if self.db.castLearning[key] == nil then self.db.castLearning[key] = value end
+    end
+    if self.db.castLearning.version == 1 and type(self.db.castLearning.dungeons) ~= "table" then
+        self.db.castLearning.dungeons = {}
     end
 
     -- Remove obsolete settings left by pre-1.5 profiles.
@@ -126,6 +138,33 @@ SlashCmdList.BFAKEYALERTS = function(input)
         end
     elseif command == "config" then
         BKA.Options:Open()
+    elseif command == "learn" then
+        local subcommand, detail = string.match(argument, "^(%S*)%s*(.-)%s*$")
+        local learner = BKA.CastLearning
+        if subcommand == "status" then
+            local summary = learner:GetSummary()
+            BKA:Print(BKA:L("LEARN_STATUS_FMT", tostring(summary.dungeonID or "-"), summary.observations,
+                summary.npcs, summary.spells, summary.hits, summary.misses, summary.accuracy * 100))
+        elseif subcommand == "debug" and (detail == "on" or detail == "off") then
+            BKA.db.castLearning.debug = detail == "on"
+            if BKA.Nameplates then BKA.Nameplates:RefreshAll() end
+            BKA:Print(BKA:L("LEARN_DEBUG_FMT", BKA:L(detail == "on" and "ON" or "OFF")))
+        elseif subcommand == "inspect" then
+            BKA.CastPredictionUI:OpenInspector()
+        elseif subcommand == "dump" and detail == "target" then
+            learner:DumpTarget()
+        elseif subcommand == "export" then
+            BKA.CastPredictionUI:ShowExport(learner:Export())
+        elseif subcommand == "reset" then
+            if detail == "confirm" then
+                learner:Reset(true)
+                BKA:Print(BKA:L("LEARN_RESET_DONE"))
+            else
+                BKA:Print(BKA:L("LEARN_RESET_CONFIRM"))
+            end
+        else
+            BKA:Print(BKA:L("LEARN_HELP"))
+        end
     elseif command == "soundpreview" then
         if argument == "" then
             BKA.Options:Open("sounds")

@@ -4,7 +4,66 @@ BKA.Options = Options
 
 local WHITE = "Interface\\Buttons\\WHITE8X8"
 local ACCENT = {0.40, 0.88, 0.74}
-local SECTIONS = {"general", "mechanics", "nameplates", "kicks", "keystone", "sounds"}
+local SUPPORT_URL = "https://www.donationalerts.com/r/makarenr"
+local SECTIONS = {"general", "mechanics", "nameplates", "prediction", "kicks", "keystone", "sounds"}
+
+function Options:ShowSupportLink()
+    if not self.supportDialog then
+        local frame = CreateFrame("Frame", "BFAKeyAlertsSupportDialog", UIParent)
+        frame:SetSize(500, 145); frame:SetPoint("CENTER"); frame:SetFrameStrata("DIALOG")
+        frame:EnableMouse(true)
+        BKA.HUD:StyleFrame(frame, 0.97)
+        local title = BKA.HUD:Text(frame, 16, 18, -17, 450)
+        title:SetText(BKA:L("SUPPORT_TITLE"))
+        local hint = BKA.HUD:Text(frame, 11, 18, -47, 460)
+        hint:SetText(BKA:L("SUPPORT_COPY_HINT"))
+        local edit = CreateFrame("EditBox", nil, frame, "InputBoxTemplate")
+        edit:SetSize(450, 24); edit:SetPoint("TOPLEFT", 22, -78)
+        edit:SetAutoFocus(false)
+        edit:SetScript("OnEscapePressed", function() frame:Hide() end)
+        edit:SetScript("OnEnterPressed", function(self) self:HighlightText() end)
+        local close = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+        close:SetSize(90, 22); close:SetPoint("BOTTOMRIGHT", -18, 12)
+        close:SetText(BKA:L("CLOSE"))
+        close:SetScript("OnClick", function() frame:Hide() end)
+        frame.edit = edit
+        frame:Hide()
+        tinsert(UISpecialFrames, frame:GetName())
+        self.supportDialog = frame
+    end
+    local edit = self.supportDialog.edit
+    edit:SetText(SUPPORT_URL)
+    self.supportDialog:Show()
+    edit:SetFocus()
+    edit:HighlightText()
+end
+
+function Options:AddSupportLink(parent, point, relativePoint, x, y, width)
+    local link = CreateFrame("Button", nil, parent)
+    link:SetSize(width, 18)
+    link:SetPoint(point, parent, relativePoint, x, y)
+    link:SetFrameLevel(parent:GetFrameLevel() + 2)
+    link:EnableMouse(true)
+    link:RegisterForClicks("LeftButtonUp")
+    local text = link:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    text:SetAllPoints(link)
+    text:SetJustifyH("LEFT")
+    text:SetWordWrap(false)
+    text:SetText(BKA:L("SUPPORT_LINK") .. "  " .. SUPPORT_URL)
+    text:SetTextColor(unpack(ACCENT))
+    link:SetScript("OnEnter", function(self)
+        text:SetTextColor(0.72, 1, 0.90)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:SetText(BKA:L("SUPPORT_CLICK_HINT"))
+        GameTooltip:Show()
+    end)
+    link:SetScript("OnLeave", function()
+        text:SetTextColor(unpack(ACCENT))
+        GameTooltip:Hide()
+    end)
+    link:SetScript("OnClick", function() Options:ShowSupportLink() end)
+    return link
+end
 
 local function style(frame, alpha)
     frame:SetBackdrop({ bgFile = WHITE })
@@ -64,7 +123,13 @@ local function refreshCombat(clear)
 end
 
 local function onChanged(path)
-    if path == "enabled" then
+    if string.match(path, "^castLearning%.") then
+        if BKA.CastLearning and BKA.CastLearning.SettingsChanged then BKA.CastLearning:SettingsChanged() end
+        if BKA.CastPredictionUI then
+            BKA.CastPredictionUI:Refresh()
+        end
+        if BKA.Nameplates then BKA.Nameplates:RefreshAll() end
+    elseif path == "enabled" then
         BKA:RefreshActivation()
         if BKA.db.enabled == false and BKA.Alerts then BKA.Alerts:Clear() end
         if BKA.Nameplates then BKA.Nameplates:RefreshAll(); BKA.Nameplates:RefreshClickTargeting() end
@@ -159,7 +224,7 @@ local function slider(p, path, titleKey, minValue, maxValue, step, format)
     Options.controls[#Options.controls + 1] = function()
         s:SetValue(tonumber(get(path)) or minValue)
         local displayed = tonumber(get(path)) or minValue
-        if path == "kickTracker.alpha" or path == "keystoneHUD.backgroundAlpha" then displayed = displayed * 100 end
+        if path == "kickTracker.alpha" or path == "keystoneHUD.backgroundAlpha" or path == "castLearning.minimumConfidence" then displayed = displayed * 100 end
         valueText:SetText(string.format(format, displayed))
     end
     p.y = p.y - 59
@@ -205,6 +270,53 @@ local function buildNameplates()
     toggle(p, "showNameplates", "OPT_NAMEPLATES", "OPT_NAMEPLATES_DESC")
     toggle(p, "showFrontalTarget", "OPT_FRONTAL", "OPT_FRONTAL_DESC")
     toggle(p, "clickableNameplateAlerts", "OPT_CLICKABLE", nil, 116, true)
+end
+
+local function buildPrediction()
+    local p = page("prediction")
+    heading(p, "CP_SETTINGS")
+    toggle(p, "castLearning.enabled", "CP_ENABLED", "CP_ENABLED_DESC")
+    toggle(p, "castLearning.predictions", "CP_PREDICTIONS", "CP_PREDICTIONS_DESC")
+    toggle(p, "castLearning.importantOnly", "CP_IMPORTANT", "CP_IMPORTANT_DESC")
+    toggle(p, "castLearning.debug", "CP_DEBUG", "CP_DEBUG_DESC")
+    slider(p, "castLearning.leadTime", "CP_LEAD_TIME", 0.3, 3.0, 0.1, "%.1fs")
+    slider(p, "castLearning.minimumSamples", "CP_MIN_SAMPLES", 3, 20, 1, "%d")
+    slider(p, "castLearning.minimumConfidence", "CP_MIN_CONFIDENCE", 0, 1, 0.05, "%.0f%%")
+    heading(p, "CP_STATISTICS")
+    local statsRow = panel(p.child, 12, p.y, 580, 58, 0.47)
+    local statsText = label(statsRow, 11, 12, -10, 550, "", ACCENT)
+    Options.controls[#Options.controls + 1] = function()
+        local stats = BKA.CastLearning and BKA.CastLearning:GetSummary() or {}
+        local accuracy = tonumber(stats.accuracy) or 0
+        if accuracy <= 1 then accuracy = accuracy * 100 end
+        statsText:SetText(BKA:L("CP_STATS_FMT", tostring(stats.dungeonID or "-"),
+            tonumber(stats.observations) or 0, tonumber(stats.npcs) or 0,
+            tonumber(stats.spells) or 0, tonumber(stats.entries) or 0,
+            tonumber(stats.highConfidence) or 0,
+            tonumber(stats.hits) or 0, tonumber(stats.misses) or 0, accuracy))
+    end
+    p.y = p.y - 65
+    actions(p,
+        {"CP_INSPECTOR", function() BKA.CastPredictionUI:OpenInspector() end},
+        {"CP_EXPORT", function()
+            local text = BKA.CastLearning and BKA.CastLearning:Export() or ""
+            BKA.CastPredictionUI:ShowExport(text)
+        end})
+    heading(p, "CP_PREVIEW")
+    local preview = panel(p.child, 12, p.y, 580, 94, 0.47)
+    label(preview, 10, 12, -5, 550, BKA:L("OPT_ENEMY"), {0.62, 0.71, 0.77})
+    local ghost = panel(preview, 12, -29, 260, 48, 0.45)
+    local real = panel(preview, 294, -29, 270, 48, 0.78)
+    ghost:SetAlpha(0.30)
+    local ghostIcon = ghost:CreateTexture(nil, "ARTWORK")
+    ghostIcon:SetSize(26, 26); ghostIcon:SetPoint("LEFT", 9, 0)
+    ghostIcon:SetTexture("Interface\\Icons\\Ability_Kick"); ghostIcon:SetDesaturated(true)
+    local realIcon = real:CreateTexture(nil, "ARTWORK")
+    realIcon:SetSize(26, 26); realIcon:SetPoint("LEFT", 9, 0)
+    realIcon:SetTexture("Interface\\Icons\\Ability_Kick")
+    label(ghost, 10, 42, -8, 208, BKA:L("CP_GHOST_PREVIEW") .. " " .. BKA:LocalizeAction("KICK") .. "  ~0.8", ACCENT)
+    label(real, 10, 42, -8, 218, BKA:L("CP_REAL_PREVIEW") .. " " .. BKA:LocalizeAction("KICK") .. "  0.8", ACCENT)
+    p.y = p.y - 102
 end
 
 local function buildKicks()
@@ -281,6 +393,7 @@ function Options:Initialize()
     header:SetScript("OnDragStop", function() frame:StopMovingOrSizing() end)
     label(frame, 17, 18, -18, 350, BKA:L("ADDON_TITLE"))
     label(frame, 10, 20, -42, 350, BKA:L("OPT_SUBTITLE"), {0.58, 0.70, 0.76})
+    self:AddSupportLink(frame, "TOPRIGHT", "TOPRIGHT", -61, -30, 385)
     local close = button(frame, "×", 806, -11, 32, 30, function() frame:Hide() end)
     close:SetFrameLevel(header:GetFrameLevel() + 1)
     local separator = frame:CreateTexture(nil, "BACKGROUND")
@@ -295,7 +408,7 @@ function Options:Initialize()
         self.nav[section] = nav
     end
     self.frame = frame
-    buildGeneral(); buildMechanics(); buildNameplates(); buildKicks(); buildKeystone(); buildSounds()
+    buildGeneral(); buildMechanics(); buildNameplates(); buildPrediction(); buildKicks(); buildKeystone(); buildSounds()
     for _, item in pairs(self.pages) do
         item.child:SetHeight(math.max(465, -item.y + 16))
     end

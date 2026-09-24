@@ -346,7 +346,7 @@ function Nameplates:RefreshInfestedMarker(unit)
     if show and BKA.Affixes.GetInfestedAura then spellID = BKA.Affixes:GetInfestedAura(unit) end
     if spellID then
         overlay.infestedMarker.icon:SetTexture((GetSpellTexture and GetSpellTexture(spellID)) or "Interface\\Icons\\achievement_nazmir_boss_ghuun")
-        updateInfestedMarkerAnchor(overlay, overlay.activeState or overlay.temporaryState or overlay.persistentState)
+        updateInfestedMarkerAnchor(overlay, overlay.activeState or overlay.temporaryState or overlay.predictionState or overlay.persistentState)
         overlay.infestedMarker:Show()
     else
         overlay.infestedMarker:Hide()
@@ -498,10 +498,14 @@ function Nameplates:GetOverlay(unit)
         if overlay.ownerGUID ~= guid then
             overlay.ownerGUID = guid
             overlay.generation = (overlay.generation or 0) + 1
-            overlay.persistentState, overlay.temporaryState, overlay.activeState = nil, nil, nil
+            overlay.persistentState, overlay.temporaryState, overlay.activeState, overlay.predictionState = nil, nil, nil, nil
             overlay:SetScript("OnUpdate", nil)
             setGlow(overlay, false)
             if overlay.infestedMarker then overlay.infestedMarker:Hide() end
+            overlay:SetAlpha(1)
+            overlay.icon:SetDesaturated(false)
+            overlay.circle.icon:SetDesaturated(false)
+            overlay.square.icon:SetDesaturated(false)
             resetHoverVisual(overlay)
         end
         return overlay
@@ -526,6 +530,7 @@ function Nameplates:GetOverlay(unit)
     overlay.persistentState = nil
     overlay.temporaryState = nil
     overlay.activeState = nil
+    overlay.predictionState = nil
     overlay:SetScript("OnUpdate", nil)
     resetHoverVisual(overlay)
     self.overlays[unit] = overlay
@@ -539,6 +544,8 @@ function Nameplates:Render(unit)
         overlay.activeState = nil
         overlay.temporaryState = nil
         overlay.persistentState = nil
+        overlay.predictionState = nil
+        overlay:SetScript("OnUpdate", nil)
         setGlow(overlay, false)
         stopShapeAnimations(overlay)
         overlay.circle:Hide()
@@ -546,11 +553,15 @@ function Nameplates:Render(unit)
         overlay.controlBadge.anim:Stop()
         overlay.controlBadge:Hide()
         if overlay.infestedMarker then overlay.infestedMarker:Hide() end
+        overlay:SetAlpha(1)
+        overlay.icon:SetDesaturated(false)
+        overlay.circle.icon:SetDesaturated(false)
+        overlay.square.icon:SetDesaturated(false)
         resetHoverVisual(overlay)
         overlay:Hide()
         return
     end
-    local state = overlay.activeState or overlay.temporaryState or overlay.persistentState
+    local state = overlay.activeState or overlay.temporaryState or overlay.predictionState or overlay.persistentState
     if not state then
         overlay:SetScript("OnUpdate", nil)
         setGlow(overlay, false)
@@ -559,10 +570,19 @@ function Nameplates:Render(unit)
         overlay.square:Hide()
         overlay.controlBadge.anim:Stop()
         overlay.controlBadge:Hide()
+        overlay:SetAlpha(1)
+        overlay.icon:SetDesaturated(false)
+        overlay.circle.icon:SetDesaturated(false)
+        overlay.square.icon:SetDesaturated(false)
         resetHoverVisual(overlay)
         updateInfestedMarkerAnchor(overlay, false)
         overlay:Hide()
         return
+    end
+    if state.prediction and state.predictionData then
+        local data = state.predictionData
+        state.detail = BKA.db.castLearning.debug and
+            string.format("%.0f%%  ±%.2f", (data.confidence or 0) * 100, data.stddev or 0) or BKA:L("SOON")
     end
     local color = BKA.colors[state.severity] or BKA.colors.LOW
     local normalized = BKA:NormalizeAction(state.action or state.label, state.action or state.label)
@@ -576,7 +596,11 @@ function Nameplates:Render(unit)
         shape = "SQUARE"
     end
     setShapeMode(overlay, shape, state, color)
+    overlay:SetAlpha(state.prediction and 0.30 or 1)
     overlay.icon:SetTexture(BKA:ResolveIcon(state.ability, state))
+    overlay.icon:SetDesaturated(state.prediction and true or false)
+    overlay.circle.icon:SetDesaturated(state.prediction and true or false)
+    overlay.square.icon:SetDesaturated(state.prediction and true or false)
     overlay.label:ClearAllPoints()
     overlay.label:SetPoint("LEFT", overlay.icon, "RIGHT", 5, state.detail and 6 or 0)
     overlay.label:SetPoint("RIGHT", -31, state.detail and 6 or 0)
@@ -599,27 +623,101 @@ function Nameplates:Render(unit)
             line:SetColorTexture(1, 0.42, 0.06, 1)
         end
     end
-    setGlow(overlay, (personal or tracking) and shape == "RECTANGLE")
+    setGlow(overlay, not state.prediction and (personal or tracking) and shape == "RECTANGLE")
+    if state.prediction then
+        stopShapeAnimations(overlay)
+        overlay.controlBadge.anim:Stop()
+    end
     overlay:Show()
     updateInfestedMarkerAnchor(overlay, true)
     overlay:SetScript("OnUpdate", function(_, elapsed)
         Nameplates:UpdateHoverVisual(overlay, elapsed)
-        local current = overlay.activeState
-        if not current then
+        local current = overlay.activeState or overlay.temporaryState or overlay.predictionState or overlay.persistentState
+        local countdownState = overlay.activeState or (not overlay.temporaryState and overlay.predictionState or nil)
+        if not current or not countdownState then
             overlay.countdown:SetText("")
             overlay.circle.countdown:SetText("")
             overlay.square.countdown:SetText("")
             return
         end
-        local remaining = current.endTime - GetTime()
+        current = countdownState
+        if current.prediction then
+            overlay.predictionElapsed = (overlay.predictionElapsed or 0) + elapsed
+            if overlay.predictionElapsed < 0.08 then return end
+            overlay.predictionElapsed = 0
+        end
+        local untilTime = current.prediction and current.expectedTime or current.endTime
+        if type(untilTime) ~= "number" then
+            overlay.countdown:SetText("")
+            overlay.circle.countdown:SetText("")
+            overlay.square.countdown:SetText("")
+            return
+        end
+        local remaining = untilTime - GetTime()
         if remaining <= 0 then
-            BKA.ActiveCasts:Expire(unit, current.generation)
+            if current.prediction and GetTime() > current.expectedTime + (tonumber(current.lateWindow) or 0) then
+                overlay.predictionState = nil
+                Nameplates:Render(unit)
+            elseif current.prediction then
+                overlay.countdown:SetText("~0.0")
+                overlay.circle.countdown:SetText("~0.0")
+                overlay.square.countdown:SetText("~0.0")
+            elseif current == overlay.activeState then
+                BKA.ActiveCasts:Expire(unit, current.generation)
+            else
+                overlay.countdown:SetText("")
+                overlay.circle.countdown:SetText("")
+                overlay.square.countdown:SetText("")
+            end
         else
-            overlay.countdown:SetFormattedText("%.1f", remaining)
-            overlay.circle.countdown:SetFormattedText("%.1f", remaining)
-            overlay.square.countdown:SetFormattedText("%.1f", remaining)
+            local prefix = current.prediction and "~" or ""
+            overlay.countdown:SetFormattedText(prefix .. "%.1f", remaining)
+            overlay.circle.countdown:SetFormattedText(prefix .. "%.1f", remaining)
+            overlay.square.countdown:SetFormattedText(prefix .. "%.1f", remaining)
         end
     end)
+end
+
+function Nameplates:ShowPrediction(unit, prediction, ability)
+    if not unit or type(prediction) ~= "table" or not BKA.db or BKA.db.showNameplates == false then return end
+    local guid = UnitGUID(unit)
+    local sourceGUID = prediction.sourceGUID or prediction.guid
+    if not guid or (sourceGUID and guid ~= sourceGUID) then return end
+    local overlay = self:GetOverlay(unit)
+    if not overlay or overlay.ownerGUID ~= guid then return end
+    if overlay.predictionState and overlay.predictionState.predictionData == prediction then return end
+    local action = BKA:NormalizeAction(prediction.action or ability and (ability.nameplateAction or ability.action) or "CAST", ability and ability.mechanic)
+    overlay.predictionState = {
+        prediction = true, sourceGUID = sourceGUID or guid, spellID = prediction.spellID,
+        predictionData = prediction,
+        expectedTime = tonumber(prediction.expectedTime), earlyWindow = prediction.earlyWindow,
+        lateWindow = prediction.lateWindow, confidence = prediction.confidence,
+        samples = prediction.samples, source = prediction.source, ability = ability,
+        action = action, controlAction = prediction.controlAction,
+        severity = prediction.severity or ability and ability.severity or "LOW",
+        label = BKA:LocalizeAction(action),
+        detail = BKA.db.castLearning.debug and string.format("%.0f%%  ±%.2f", (prediction.confidence or 0) * 100, prediction.stddev or 0) or BKA:L("SOON"),
+    }
+    if not overlay.predictionState.expectedTime then overlay.predictionState.expectedTime = GetTime() end
+    self:Render(unit)
+end
+
+function Nameplates:HidePrediction(unit, guid)
+    local overlay = unit and self.overlays[unit]
+    local overlayUnit = unit
+    if not overlay and guid then
+        for candidateUnit, candidate in pairs(self.overlays) do
+            if candidate.ownerGUID == guid and candidate.predictionState then
+                overlay = candidate
+                overlayUnit = candidateUnit
+                break
+            end
+        end
+    end
+    if not overlay or not overlay.predictionState then return end
+    if guid and overlay.ownerGUID ~= guid then return end
+    overlay.predictionState = nil
+    self:Render(overlayUnit)
 end
 
 function Nameplates:Display(unit, spellID, label, severity, persistent, duration, controlAction)
@@ -754,6 +852,8 @@ end
 function Nameplates:OnAdded(unit)
     if BKA.db and BKA.db.showNameplates ~= false then self:EnsureClickTargeting() end
     BKA.Targets:AddUnit(unit)
+    if BKA.CastPredictionUI then BKA.CastPredictionUI:OnAdded(unit) end
+    if BKA.CastLearning and BKA.CastLearning.OnNameplateAdded then BKA.CastLearning:OnNameplateAdded(unit) end
     self:RestorePersistent(unit)
     if BKA:GetNPCID(UnitGUID(unit)) == 141851 and BKA.Affixes:IsActive(16) and BKA.db.showInfestedAdds ~= false then
         BKA.Alerts:Show({
@@ -765,6 +865,8 @@ function Nameplates:OnAdded(unit)
 end
 
 function Nameplates:OnRemoved(unit)
+    if BKA.CastPredictionUI then BKA.CastPredictionUI:OnRemoved(unit) end
+    if BKA.CastLearning and BKA.CastLearning.OnNameplateRemoved then BKA.CastLearning:OnNameplateRemoved(unit) end
     BKA.ActiveCasts:UnitGone(unit)
     BKA.Targets:RemoveUnit(unit)
     local overlay = self.overlays[unit]
@@ -777,6 +879,10 @@ function Nameplates:OnRemoved(unit)
         overlay.square:Hide()
         overlay.controlBadge.anim:Stop()
         overlay.controlBadge:Hide()
+        overlay:SetAlpha(1)
+        overlay.icon:SetDesaturated(false)
+        overlay.circle.icon:SetDesaturated(false)
+        overlay.square.icon:SetDesaturated(false)
         resetHoverVisual(overlay)
         if overlay.infestedMarker then
             overlay.infestedMarker:Hide()
@@ -787,6 +893,7 @@ function Nameplates:OnRemoved(unit)
         overlay.persistentState = nil
         overlay.temporaryState = nil
         overlay.activeState = nil
+        overlay.predictionState = nil
         self.overlays[unit] = nil
         self.freeOverlays[#self.freeOverlays + 1] = overlay
     end
@@ -832,6 +939,10 @@ function Nameplates:Clear()
         overlay.square:Hide()
         overlay.controlBadge.anim:Stop()
         overlay.controlBadge:Hide()
+        overlay:SetAlpha(1)
+        overlay.icon:SetDesaturated(false)
+        overlay.circle.icon:SetDesaturated(false)
+        overlay.square.icon:SetDesaturated(false)
         resetHoverVisual(overlay)
         if overlay.infestedMarker then
             overlay.infestedMarker:Hide()
@@ -842,6 +953,7 @@ function Nameplates:Clear()
         overlay.persistentState = nil
         overlay.temporaryState = nil
         overlay.activeState = nil
+        overlay.predictionState = nil
         self.freeOverlays[#self.freeOverlays + 1] = overlay
         self.overlays[unit] = nil
     end

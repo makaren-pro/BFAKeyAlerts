@@ -61,6 +61,21 @@ local classCC = {
     WARLOCK = { { id = 30283, badge = "CC" } },
 }
 
+-- These are SPELL_AURA_* IDs observed on the target, not player cast IDs from classCC.
+-- Unverified cast-to-aura mappings must stay out of this table until checked on BFA/Firestorm.
+local hardCCAuras = {
+    [118905] = true, -- Capacitor Totem (cast 192058)
+    [132168] = true, -- Shockwave (cast 46968)
+    [82691] = true,  -- Ring of Frost (cast 113724)
+    [24394] = true,  -- Intimidation (cast 19577)
+    [3355] = true,   -- Freezing Trap (ability 187650)
+    [105421] = true, -- Blinding Light (cast 115750)
+}
+
+function Tracker:IsHardCCAura(spellID)
+    return hardCCAuras[spellID] == true
+end
+
 local READY = {0.31, 0.88, 0.69}
 local COOLDOWN = {0.98, 0.62, 0.18}
 local BLOCKED = {0.90, 0.30, 0.18}
