@@ -12,6 +12,7 @@ Standalone Mythic+ alerts and UI for Battle for Azeroth 8.3 / Firestorm BFA. Aut
 - Per-action sounds and movable UI
 - Minimap button for settings and Discord contact
 - Automatic keystone insertion and Enemy Forces tooltip
+- Adaptive Cast Prediction
 
 ## Localization
 
