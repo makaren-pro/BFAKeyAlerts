@@ -62,24 +62,31 @@ function Nameplates:GetDesiredClickInsets()
 end
 
 function Nameplates:RefreshClickTargeting()
-    if not self:CaptureClickTargetingDefaults() then
-        self.clickTargetingApplied = false
-        return false
-    end
-
-    local enabled = BKA.db and BKA.db.enabled ~= false and BKA.db.showNameplates ~= false and BKA.db.clickableNameplateAlerts ~= false
+    local enabled = not self.forceRestore and BKA.db and BKA.db.enabled ~= false and BKA.db.showNameplates ~= false and BKA.db.clickableNameplateAlerts ~= false
     if enabled then
+        if not self:CaptureClickTargetingDefaults() then return false end
         local left, right, top, bottom = self:GetDesiredClickInsets()
         C_NamePlate.SetNamePlateEnemyClickThrough(false)
         C_NamePlate.SetNamePlateEnemyPreferredClickInsets(left, right, top, bottom)
         self.appliedClickInsets = { left, right, top, bottom }
         self.clickTargetingApplied = true
-    else
+    elseif self.clickTargetingApplied and clickAPIAvailable() then
         local defaults = self.clickDefaults
-        C_NamePlate.SetNamePlateEnemyClickThrough(defaults.clickThrough)
-        C_NamePlate.SetNamePlateEnemyPreferredClickInsets(defaults.left, defaults.right, defaults.top, defaults.bottom)
+        local left, right, top, bottom = C_NamePlate.GetNamePlateEnemyPreferredClickInsets()
+        local applied = self.appliedClickInsets
+        -- Another nameplate addon may have changed these values after BKA did.
+        -- Restore only fields which still have the exact values BKA applied.
+        local ownsInsets = applied and left == applied[1] and right == applied[2] and top == applied[3] and bottom == applied[4]
+        if ownsInsets and C_NamePlate.GetNamePlateEnemyClickThrough() == false then
+            C_NamePlate.SetNamePlateEnemyClickThrough(defaults.clickThrough)
+        end
+        if ownsInsets then
+            C_NamePlate.SetNamePlateEnemyPreferredClickInsets(defaults.left, defaults.right, defaults.top, defaults.bottom)
+        end
         self.appliedClickInsets = nil
         self.clickTargetingApplied = false
+        self.clickDefaults = nil
+        self.clickDefaultsCaptured = false
     end
     return self.clickTargetingApplied
 end
@@ -96,7 +103,6 @@ function Nameplates:PrintClickTargetingStatus()
         BKA:Print(BKA:L("PLATE_API_UNAVAILABLE"))
         return
     end
-    self:CaptureClickTargetingDefaults()
     local left, right, top, bottom = C_NamePlate.GetNamePlateEnemyPreferredClickInsets()
     BKA:Print(BKA:L("PLATE_STATUS_FMT",
         tostring(BKA.db and BKA.db.clickableNameplateAlerts ~= false),
@@ -104,6 +110,13 @@ function Nameplates:PrintClickTargetingStatus()
         tostring(C_NamePlate.GetNamePlateEnemyClickThrough()),
         string.format("%.1f/%.1f/%.1f/%.1f", tonumber(left) or 0, tonumber(right) or 0, tonumber(top) or 0, tonumber(bottom) or 0)))
 end
+
+local logout = CreateFrame("Frame")
+logout:RegisterEvent("PLAYER_LOGOUT")
+logout:SetScript("OnEvent", function()
+    Nameplates.forceRestore = true
+    Nameplates:RefreshClickTargeting()
+end)
 
 local function priority(action, severity, persistent)
     local rank = BKA.severityRank[severity] or 1

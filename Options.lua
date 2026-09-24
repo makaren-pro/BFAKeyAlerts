@@ -1,390 +1,340 @@
 local BKA = BFAKeyAlerts
-local Options = {}
+local Options = { pages = {}, controls = {} }
 BKA.Options = Options
 
-local isRussian = BKA.locale == "ruRU"
-local L = isRussian and {
-    title = "BFA Key Alerts",
-    rootDescription = "Настройки разделены по разделам. Выберите нужный пункт слева или откройте его кнопкой ниже.",
-    general = "Основное", mechanics = "Механики", nameplates = "Неймплейты",
-    kicks = "Кики группы", keystone = "Таймер ключа", sounds = "Звуки",
+local WHITE = "Interface\\Buttons\\WHITE8X8"
+local ACCENT = {0.40, 0.88, 0.74}
+local SECTIONS = {"general", "mechanics", "nameplates", "kicks", "keystone", "sounds"}
 
-    generalDescription = "Основное состояние аддона и отдельное управление центральными предупреждениями.",
-    mechanicsDescription = "Фильтры механик по ролям и сезонным аффиксам.",
-    nameplatesDescription = "Отдельное включение и поведение предупреждений на неймплейтах мобов.",
-    kicksDescription = "Компактная панель киков и контроля группы: основной кик и дополнительные способности контроля.",
-    keystoneDescription = "Mythic+ таймер из ProtPixelBFA: +3/+2/+1, силы, боссы, смерти и штраф.",
-    soundsDescription = "Глобальный звук, отдельные голосовые действия и ручное прослушивание.",
-
-    enabled = "Включить BFA Key Alerts",
-    enableAlerts = "Показывать центральные Alerts",
-    enableNameplates = "Показывать BKA-неймплейты",
-    globalSound = "Включить боевые звуки",
-    centerAlerts = "Центральные предупреждения",
-    preview = "Показать превью", hidePreview = "Скрыть превью",
-    unlock = "Разблокировать", lock = "Закрепить", reset = "Сбросить положение",
-    scale = "Масштаб", width = "Ширина", opacity = "Прозрачность фона", panelOpacity = "Прозрачность панели",
-    style = "Стиль предупреждений", bar = "Полоса", icon = "Иконка",
-    tank = "Танковые предупреждения", healer = "Хилерские предупреждения",
-    infested = "Показывать метки Г'ууна (заражённые мобы + Spawn)",
-    roleFilters = "Ролевые фильтры", seasonal = "Сезонные механики",
-    frontalTarget = "Показывать цель и режим FRONTAL",
-    clickableNameplateAlerts = "Клик по BKA-алерту выбирает моба",
-    nameplateBehavior = "Поведение неймплейтов",
-    showKickTracker = "Показывать панель киков группы",
-    onlyInKey = "Показывать только в активном ключе",
-    kickTracker = "Кики + контроль",
-    kickHint = "Слева - игрок, иконка основного кика и полоса КД. Справа - до 4 компактных иконок дополнительных киков/СС. ? означает, что талант пока не подтверждён по боевому логу.",
-    showKeystone = "Показывать новый таймер ключа",
-    hideBlizzard = "Скрывать стандартный таймер и Objective Tracker в активном ключе",
-    keystoneHint = "Сними закрепление, чтобы увидеть превью вне ключа и перетащить таймер голубой полоской сверху.",
-    soundActions = "Звуки действий", testAllSounds = "Прослушать все звуки", resetCombatSounds = "Сбросить боевые звуки",
-    soundHint = "Галочка включает звук действия; кнопка справа воспроизводит его вручную.",
-    hint = "Нажмите кнопку Разблокировать, затем перетащите голубую область мышью.",
-
-    rootGeneralHint = "Главный переключатель и центральные Alerts.",
-    rootMechanicsHint = "Танк/хил фильтры и 4-й сезонный аффикс.",
-    rootNameplatesHint = "Геометрия AOE/CLEAVE, FRONTAL и кликабельные маркеры.",
-    rootKicksHint = "Кики и дополнительные способности контроля всей группы.",
-    rootKeystoneHint = "Новый Mythic+ таймер вместо стандартного.",
-    rootSoundsHint = "Глобальный звук и отдельные голосовые команды.",
-} or {
-    title = "BFA Key Alerts",
-    rootDescription = "Settings are split into sections. Pick a category on the left or use the buttons below.",
-    general = "General", mechanics = "Mechanics", nameplates = "Nameplates",
-    kicks = "Group kicks", keystone = "Keystone timer", sounds = "Sounds",
-
-    generalDescription = "Master addon state and independent center-alert visibility.",
-    mechanicsDescription = "Role and seasonal-affix filters.",
-    nameplatesDescription = "Independent enable switch and behavior for enemy nameplate alerts.",
-    kicksDescription = "Compact party interrupts and control: primary kick and additional CC.",
-    keystoneDescription = "ProtPixelBFA Mythic+ timer: +3/+2/+1, forces, bosses, deaths, and penalty.",
-    soundsDescription = "Global combat sound, per-action voice alerts, and manual previews.",
-
-    enabled = "Enable BFA Key Alerts", enableAlerts = "Show center alerts", enableNameplates = "Show BKA nameplates",
-    globalSound = "Enable combat sounds", centerAlerts = "Center alerts",
-    preview = "Show preview", hidePreview = "Hide preview", unlock = "Unlock", lock = "Lock", reset = "Reset position",
-    scale = "Scale", width = "Width", opacity = "Background opacity", panelOpacity = "Panel opacity",
-    style = "Alert style", bar = "Bar", icon = "Icon",
-    tank = "Tank alerts", healer = "Healer alerts", infested = "Show G'huun markers (infested mobs + Spawn)",
-    roleFilters = "Role filters", seasonal = "Seasonal mechanics",
-    frontalTarget = "Show FRONTAL target and mode", clickableNameplateAlerts = "Click BKA nameplate alert to target mob",
-    nameplateBehavior = "Nameplate behavior",
-    showKickTracker = "Show group kick tracker", onlyInKey = "Show only during an active keystone", kickTracker = "Interrupts + control",
-    kickHint = "Player, main-kick icon and cooldown bar are on the left. Up to 4 compact extra-kick/CC icons are on the right. ? means an optional talent has not been confirmed from combat log yet.",
-    showKeystone = "Show custom keystone timer", hideBlizzard = "Hide Blizzard timer and Objective Tracker during an active key",
-    keystoneHint = "Unlock to preview outside a key and drag using the blue handle above the panel.",
-    soundActions = "Action sounds", testAllSounds = "Preview all sounds", resetCombatSounds = "Reset combat sounds",
-    soundHint = "The checkbox enables that combat sound; the button previews it.",
-    hint = "Click Unlock, then drag the blue area with the mouse.",
-
-    rootGeneralHint = "Master switch and center alerts.", rootMechanicsHint = "Tank/healer filters and seasonal affix.",
-    rootNameplatesHint = "AOE/CLEAVE geometry, FRONTAL details and clickable mob alerts.",
-    rootKicksHint = "Party kicks and CC in one compact HUD.", rootKeystoneHint = "Custom Mythic+ timer replacing Blizzard presentation.",
-    rootSoundsHint = "Global sound and individual voice actions.",
-}
-
-local function createButton(parent, text, width, x, y, callback)
-    local button = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-    button:SetSize(width, 24); button:SetPoint("TOPLEFT", x, y); button:SetText(text); button:SetScript("OnClick", callback)
-    return button
+local function style(frame, alpha)
+    frame:SetBackdrop({ bgFile = WHITE })
+    frame:SetBackdropColor(0.025, 0.035, 0.055, alpha)
 end
 
-local function createSlider(parent, name, label, minValue, maxValue, step, x, y, callback)
-    local slider = CreateFrame("Slider", name, parent, "OptionsSliderTemplate")
-    slider:SetPoint("TOPLEFT", x, y); slider:SetWidth(280); slider:SetMinMaxValues(minValue, maxValue); slider:SetValueStep(step)
-    _G[name .. "Text"]:SetText(label); _G[name .. "Low"]:SetText(tostring(minValue)); _G[name .. "High"]:SetText(tostring(maxValue))
-    slider.valueText = parent:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-    slider.valueText:SetPoint("LEFT", slider, "RIGHT", 18, 0)
-    slider:SetScript("OnValueChanged", callback)
-    return slider
+local function label(parent, size, x, y, width, value, color)
+    local fs = BKA.HUD:Text(parent, size, x, y, width)
+    fs:SetFont(STANDARD_TEXT_FONT, size)
+    fs:SetText(value or "")
+    fs:SetWordWrap(true)
+    if color then fs:SetTextColor(unpack(color)) end
+    return fs
 end
 
-local function createCheckbox(parent, label, x, y, callback)
-    local check = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
-    check:SetPoint("TOPLEFT", x, y); check:SetSize(24, 24)
-    check.label = parent:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-    check.label:SetPoint("LEFT", check, "RIGHT", 4, 0); check.label:SetText(label)
-    check:SetScript("OnClick", callback)
-    return check
+local function panel(parent, x, y, width, height, alpha)
+    local f = CreateFrame("Frame", nil, parent)
+    f:SetPoint("TOPLEFT", x, y)
+    f:SetSize(width, height)
+    style(f, alpha or 0.48)
+    return f
 end
 
-local function createTitle(panel, titleText, descriptionText)
-    local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-    title:SetPoint("TOPLEFT", 16, -16); title:SetText(titleText)
-    local description = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-    description:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -10); description:SetPoint("RIGHT", panel, "RIGHT", -20, 0)
-    description:SetJustifyH("LEFT"); description:SetText(descriptionText or "")
-    return title, description
+local function button(parent, title, x, y, width, height, callback)
+    local b = CreateFrame("Button", nil, parent)
+    b:SetPoint("TOPLEFT", x, y)
+    b:SetSize(width, height or 28)
+    b:EnableMouse(true)
+    b:RegisterForClicks("LeftButtonUp")
+    b:SetHitRectInsets(0, 0, 0, 0)
+    style(b, 0.84)
+    b.text = label(b, 11, 0, 0, width, title)
+    b.text:ClearAllPoints()
+    b.text:SetPoint("CENTER")
+    b.text:SetJustifyH("CENTER")
+    b.baseColor = {0.025, 0.035, 0.055, 0.84}
+    b:SetScript("OnEnter", function(self) self:SetBackdropColor(0.10, 0.22, 0.25, 0.95) end)
+    b:SetScript("OnLeave", function(self) self:SetBackdropColor(unpack(self.baseColor)) end)
+    b:SetScript("OnClick", callback)
+    return b
 end
 
-local function createSectionTitle(panel, text, x, y)
-    local label = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    label:SetPoint("TOPLEFT", x, y); label:SetText(text); return label
+local function get(path)
+    local root, key = string.match(path, "^([^.]+)%.(.+)$")
+    if root then return BKA.db[root][key] end
+    return BKA.db[path]
 end
 
-local function createHint(panel, text, x, y, width)
-    local label = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-    label:SetPoint("TOPLEFT", x, y)
-    if width then label:SetWidth(width); label:SetJustifyH("LEFT") end
-    label:SetText(text); label:SetTextColor(0.72, 0.76, 0.82); return label
+local function set(path, value)
+    local root, key = string.match(path, "^([^.]+)%.(.+)$")
+    if root then BKA.db[root][key] = value else BKA.db[path] = value end
 end
 
-local function createChildPanel(name)
-    local panel = CreateFrame("Frame", nil, InterfaceOptionsFramePanelContainer)
-    panel.name = name; panel.parent = L.title; InterfaceOptions_AddCategory(panel); return panel
+local function refreshCombat(clear)
+    if clear and BKA.Alerts then BKA.Alerts:Clear() end
+    if BKA.Nameplates then BKA.Nameplates:RefreshAll() end
 end
 
-local function refreshCombatPresentation(clearCenter)
-    if clearCenter and BKA.Alerts then BKA.Alerts:Clear() end
-    if BKA.Nameplates and BKA.Nameplates.RefreshAll then BKA.Nameplates:RefreshAll() end
+local function onChanged(path)
+    if path == "enabled" then
+        BKA:RefreshActivation()
+        if BKA.db.enabled == false and BKA.Alerts then BKA.Alerts:Clear() end
+        if BKA.Nameplates then BKA.Nameplates:RefreshAll(); BKA.Nameplates:RefreshClickTargeting() end
+        BKA.GroupInterrupts:Refresh(true)
+        BKA.KeystoneHUD:Refresh(true)
+    elseif path == "showAlerts" then
+        if BKA.db.showAlerts == false then BKA.Alerts:Clear() end
+    elseif path == "showNameplates" then
+        if BKA.db.showNameplates == false then BKA.Nameplates:Clear() else BKA.Nameplates:RefreshAll() end
+        BKA.Nameplates:RefreshClickTargeting()
+    elseif path == "clickableNameplateAlerts" then
+        BKA.Nameplates:RefreshClickTargeting()
+    elseif path == "showTankAlerts" or path == "showHealerAlerts" or path == "showInfestedAdds" then
+        refreshCombat(true)
+    elseif path == "showFrontalTarget" then
+        refreshCombat(false)
+    elseif string.match(path, "^kickTracker%.") then
+        BKA.GroupInterrupts:ApplySettings()
+        BKA.GroupInterrupts:Refresh(true)
+    elseif string.match(path, "^keystoneHUD%.") then
+        BKA.KeystoneHUD:ApplySettings()
+        BKA.KeystoneHUD:Refresh(true)
+    elseif path == "minimap.hide" and BKA.MinimapButton then
+        BKA.MinimapButton:UpdatePosition()
+    elseif path == "alertStyle" or string.match(path, "^layout%.") then
+        BKA.Alerts:ApplyLayout()
+    end
+    Options:Refresh()
+end
+
+local function page(section)
+    local scroll = CreateFrame("ScrollFrame", nil, Options.content, "UIPanelScrollFrameTemplate")
+    scroll:SetPoint("TOPLEFT", 0, 0)
+    scroll:SetPoint("BOTTOMRIGHT", -24, 0)
+    local child = CreateFrame("Frame", nil, scroll)
+    child:SetSize(606, 1)
+    scroll:SetScrollChild(child)
+    scroll:Hide()
+    Options.pages[section] = {scroll = scroll, child = child, y = -16}
+    label(child, 19, 12, -8, 580, BKA:L("OPT_" .. string.upper(section)))
+    Options.pages[section].y = -50
+    return Options.pages[section]
+end
+
+local function heading(p, key)
+    label(p.child, 12, 12, p.y, 580, BKA:L(key), ACCENT)
+    p.y = p.y - 28
+end
+
+local function toggle(p, path, titleKey, descKey, height, warning)
+    height = height or 58
+    local row = panel(p.child, 12, p.y, 580, height, 0.47)
+    label(row, 12, 12, -10, 410, BKA:L(titleKey))
+    if descKey then label(row, 10, 12, -29, 420, BKA:L(descKey), {0.62, 0.71, 0.77}) end
+    if warning then
+        label(row, 10, 12, -53, 545, BKA:L("OPT_EXPERIMENTAL") .. "  •  " .. BKA:L("OPT_CLICK_WARNING"), {0.98, 0.76, 0.39})
+    end
+    local control = button(row, "", 470, -15, 94, 28, function()
+        set(path, get(path) == false)
+        onChanged(path)
+    end)
+    Options.controls[#Options.controls + 1] = function()
+        local active = path == "minimap.hide" and get(path) ~= true or
+            (path ~= "minimap.hide" and get(path) ~= false)
+        control.text:SetText(BKA:L(active and "ON" or "OFF"))
+        control.text:SetTextColor(active and ACCENT[1] or 0.90, active and ACCENT[2] or 0.94, active and ACCENT[3] or 0.98)
+    end
+    p.y = p.y - height - 7
+    return row
+end
+
+local function slider(p, path, titleKey, minValue, maxValue, step, format)
+    local row = panel(p.child, 12, p.y, 580, 52, 0.47)
+    label(row, 12, 12, -11, 270, BKA:L(titleKey))
+    local valueText = label(row, 11, 280, -12, 90, "", ACCENT)
+    local s = CreateFrame("Slider", nil, row)
+    s:SetPoint("TOPLEFT", 380, -15)
+    s:SetSize(175, 16)
+    s:SetOrientation("HORIZONTAL")
+    s:SetMinMaxValues(minValue, maxValue)
+    s:SetValueStep(step)
+    s:SetThumbTexture("Interface\\Buttons\\UI-SliderBar-Button-Horizontal")
+    local track = s:CreateTexture(nil, "BACKGROUND")
+    track:SetPoint("LEFT", 0, 0); track:SetPoint("RIGHT", 0, 0); track:SetHeight(3)
+    track:SetTexture(WHITE); track:SetVertexColor(0.25, 0.37, 0.43)
+    s:SetScript("OnValueChanged", function(_, value)
+        if Options.updating then return end
+        value = math.floor(value / step + 0.5) * step
+        set(path, value)
+        onChanged(path)
+    end)
+    Options.controls[#Options.controls + 1] = function()
+        s:SetValue(tonumber(get(path)) or minValue)
+        local displayed = tonumber(get(path)) or minValue
+        if path == "kickTracker.alpha" or path == "keystoneHUD.backgroundAlpha" then displayed = displayed * 100 end
+        valueText:SetText(string.format(format, displayed))
+    end
+    p.y = p.y - 59
+end
+
+local function actions(p, first, second, third)
+    local row = panel(p.child, 12, p.y, 580, 48, 0.47)
+    local defs = {first, second, third}
+    for i, def in ipairs(defs) do
+        if def then button(row, BKA:L(def[1]), 10 + (i - 1) * 185, -10, 175, 28, def[2]) end
+    end
+    p.y = p.y - 55
+end
+
+local function buildGeneral()
+    local p = page("general")
+    toggle(p, "enabled", "OPT_ENABLED", "OPT_ENABLED_DESC")
+    toggle(p, "showAlerts", "OPT_ALERTS", "OPT_ALERTS_DESC")
+    toggle(p, "minimap.hide", "OPT_MINIMAP_VISIBLE", "OPT_MINIMAP_DESC")
+    heading(p, "OPT_ALERT_LAYOUT")
+    actions(p,
+        {"OPT_BAR", function() set("alertStyle", "BAR"); onChanged("alertStyle") end},
+        {"OPT_ICON", function() set("alertStyle", "ICON"); onChanged("alertStyle") end})
+    slider(p, "layout.scale", "OPT_SCALE", 0.6, 1.6, 0.05, "%.2fx")
+    slider(p, "layout.width", "OPT_WIDTH", 280, 520, 10, "%d px")
+    actions(p,
+        {"OPT_LOCK_TOGGLE", function() BKA.Alerts:SetUnlocked(not BKA.Alerts.unlocked); Options:Refresh() end},
+        {"OPT_RESET_POSITION", function() Options:ResetLayout() end})
+end
+
+local function buildMechanics()
+    local p = page("mechanics")
+    heading(p, "OPT_ROLE_FILTERS")
+    toggle(p, "showTankAlerts", "OPT_TANK", "OPT_TANK_DESC")
+    toggle(p, "showHealerAlerts", "OPT_HEALER", "OPT_HEALER_DESC")
+    heading(p, "OPT_DUNGEON_INFO")
+    toggle(p, "showInfestedAdds", "OPT_INFESTED", "OPT_INFESTED_DESC")
+    toggle(p, "showEnemyForcesTooltip", "OPT_FORCES_TOOLTIP", "OPT_FORCES_TOOLTIP_DESC")
+end
+
+local function buildNameplates()
+    local p = page("nameplates")
+    toggle(p, "showNameplates", "OPT_NAMEPLATES", "OPT_NAMEPLATES_DESC")
+    toggle(p, "showFrontalTarget", "OPT_FRONTAL", "OPT_FRONTAL_DESC")
+    toggle(p, "clickableNameplateAlerts", "OPT_CLICKABLE", nil, 116, true)
+end
+
+local function buildKicks()
+    local p = page("kicks")
+    toggle(p, "kickTracker.shown", "OPT_KICKS", "OPT_KICKS_DESC")
+    toggle(p, "kickTracker.onlyInKey", "OPT_ONLY_IN_KEY", "OPT_ONLY_IN_KEY_DESC")
+    slider(p, "kickTracker.scale", "OPT_SCALE", 0.6, 2.0, 0.05, "%.2fx")
+    slider(p, "kickTracker.width", "OPT_WIDTH", 240, 480, 10, "%d px")
+    slider(p, "kickTracker.alpha", "OPT_ALPHA", 0.20, 1.00, 0.05, "%.0f%%")
+    actions(p,
+        {"OPT_LOCK_TOGGLE", function() set("kickTracker.locked", get("kickTracker.locked") == false); onChanged("kickTracker.locked") end},
+        {"OPT_RESET_POSITION", function() BKA.GroupInterrupts:ResetPosition(); Options:Refresh() end})
+end
+
+local function buildKeystone()
+    local p = page("keystone")
+    toggle(p, "keystoneHUD.shown", "OPT_KEY_HUD", "OPT_KEY_HUD_DESC")
+    toggle(p, "keystoneHUD.hideBlizzard", "OPT_HIDE_BLIZZARD", "OPT_HIDE_BLIZZARD_DESC")
+    toggle(p, "autoInsertKeystone", "OPT_AUTO_INSERT", "OPT_AUTO_INSERT_DESC")
+    slider(p, "keystoneHUD.scale", "OPT_SCALE", 0.6, 2.0, 0.05, "%.2fx")
+    slider(p, "keystoneHUD.backgroundAlpha", "OPT_ALPHA", 0, 1, 0.05, "%.0f%%")
+    actions(p,
+        {"OPT_LOCK_TOGGLE", function() set("keystoneHUD.locked", get("keystoneHUD.locked") == false); onChanged("keystoneHUD.locked") end},
+        {"OPT_RESET_POSITION", function() BKA.KeystoneHUD:ResetPosition(); Options:Refresh() end})
+end
+
+local function buildSounds()
+    local p = page("sounds")
+    toggle(p, "sound", "OPT_SOUND", "OPT_SOUND_DESC")
+    heading(p, "OPT_PER_ACTION")
+    label(p.child, 10, 16, p.y, 550, BKA:L("OPT_SOUND_HINT"), {0.62, 0.71, 0.77})
+    p.y = p.y - 34
+    local soundActions = BKA.Sounds:GetActions()
+    for i, action in ipairs(soundActions) do
+        local column = (i - 1) % 3
+        local row = math.floor((i - 1) / 3)
+        local x, y = 12 + column * 196, p.y - row * 43
+        local box = panel(p.child, x, y, 187, 36, 0.47)
+        local toggleSound = button(box, "", 5, -5, 112, 26, function()
+            BKA.db.soundActions[action] = BKA.db.soundActions[action] == false
+            Options:Refresh()
+        end)
+        button(box, "▶", 123, -5, 58, 26, function() BKA.Sounds:Preview(action) end)
+        Options.controls[#Options.controls + 1] = function()
+            local active = BKA.db.soundActions[action] ~= false
+            toggleSound.text:SetText(BKA:LocalizeAction(action) .. " " .. BKA:L(active and "ON" or "OFF"))
+        end
+    end
+    p.y = p.y - math.ceil(#soundActions / 3) * 43 - 10
+    actions(p,
+        {"OPT_PLAY_ALL", function() BKA.Sounds:PreviewAll() end},
+        {"OPT_RESET_SOUNDS", function() BKA.Sounds:ResetActions(); Options:Refresh() end},
+        {"OPT_PLAY_VICTORY", function() BKA.Sounds:PlayKeyUpgrade(true) end})
 end
 
 function Options:Initialize()
-    if self.panel then return end
-
-    local root = CreateFrame("Frame", "BFAKeyAlertsOptionsPanel", InterfaceOptionsFramePanelContainer)
-    root.name = L.title
-    createTitle(root, L.title, L.rootDescription)
-    local sections = {
-        { key = "general", label = L.general, hint = L.rootGeneralHint },
-        { key = "mechanics", label = L.mechanics, hint = L.rootMechanicsHint },
-        { key = "nameplates", label = L.nameplates, hint = L.rootNameplatesHint },
-        { key = "kicks", label = L.kicks, hint = L.rootKicksHint },
-        { key = "keystone", label = L.keystone, hint = L.rootKeystoneHint },
-        { key = "sounds", label = L.sounds, hint = L.rootSoundsHint },
-    }
-    for index, section in ipairs(sections) do
-        local y = -82 - (index - 1) * 69
-        createButton(root, section.label, 180, 18, y, function() Options:Open(section.key) end)
-        createHint(root, section.hint, 216, y - 4, 360)
+    if self.frame then return end
+    local frame = CreateFrame("Frame", "BFAKeyAlertsSettingsHUD", UIParent)
+    frame:SetSize(850, 540)
+    frame:SetPoint("CENTER")
+    frame:SetScale(1)
+    frame:SetFrameStrata("DIALOG")
+    frame:SetClampedToScreen(true)
+    frame:SetMovable(true)
+    frame:EnableMouse(true)
+    style(frame, 0.97)
+    local accent = frame:CreateTexture(nil, "ARTWORK")
+    accent:SetTexture(WHITE); accent:SetVertexColor(unpack(ACCENT))
+    accent:SetPoint("TOPLEFT", 1, -1); accent:SetPoint("TOPRIGHT", -1, -1); accent:SetHeight(2)
+    local header = CreateFrame("Frame", nil, frame)
+    header:SetPoint("TOPLEFT", 0, 0); header:SetPoint("TOPRIGHT", -48, 0); header:SetHeight(51)
+    header:EnableMouse(true); header:RegisterForDrag("LeftButton")
+    header:SetScript("OnDragStart", function() frame:StartMoving() end)
+    header:SetScript("OnDragStop", function() frame:StopMovingOrSizing() end)
+    label(frame, 17, 18, -18, 350, BKA:L("ADDON_TITLE"))
+    label(frame, 10, 20, -42, 350, BKA:L("OPT_SUBTITLE"), {0.58, 0.70, 0.76})
+    local close = button(frame, "×", 806, -11, 32, 30, function() frame:Hide() end)
+    close:SetFrameLevel(header:GetFrameLevel() + 1)
+    local separator = frame:CreateTexture(nil, "BACKGROUND")
+    separator:SetTexture(WHITE); separator:SetVertexColor(0.20, 0.31, 0.37)
+    separator:SetPoint("TOPLEFT", 184, -55); separator:SetPoint("BOTTOMLEFT", 184, 12); separator:SetWidth(1)
+    self.content = CreateFrame("Frame", nil, frame)
+    self.content:SetPoint("TOPLEFT", 198, -63)
+    self.content:SetSize(630, 465)
+    self.nav = {}
+    for i, section in ipairs(SECTIONS) do
+        local nav = button(frame, BKA:L("OPT_" .. string.upper(section)), 12, -74 - (i - 1) * 48, 160, 37, function() Options:ShowSection(section) end)
+        self.nav[section] = nav
     end
-    root:SetScript("OnShow", function() Options:Refresh() end)
-    InterfaceOptions_AddCategory(root); self.panel = root
-
-    -- General -----------------------------------------------------------------
-    local general = createChildPanel(L.general)
-    createTitle(general, L.title .. " - " .. L.general, L.generalDescription)
-    self.enabledCheck = createCheckbox(general, L.enabled, 18, -86, function(check)
-        BKA.db.enabled = check:GetChecked() and true or false
-        BKA:RefreshActivation()
-        if not BKA.db.enabled and BKA.Alerts then BKA.Alerts:Clear() end
-        if BKA.Nameplates then BKA.Nameplates:RefreshAll(); BKA.Nameplates:RefreshClickTargeting() end
-        if BKA.GroupInterrupts then BKA.GroupInterrupts:Refresh(true) end
-        if BKA.KeystoneHUD then BKA.KeystoneHUD:Refresh(true) end
-    end)
-    createSectionTitle(general, L.centerAlerts, 18, -130)
-    self.alertsEnabledCheck = createCheckbox(general, L.enableAlerts, 18, -154, function(check)
-        BKA.db.showAlerts = check:GetChecked() and true or false
-        if not BKA.db.showAlerts then BKA.Alerts:Clear() end
-    end)
-    self.previewButton = createButton(general, L.preview, 145, 18, -194, function() Options:TogglePreview() end)
-    self.moveButton = createButton(general, L.unlock, 145, 172, -194, function() BKA.Alerts:SetUnlocked(not BKA.Alerts.unlocked) end)
-    self.resetButton = createButton(general, L.reset, 170, 326, -194, function() Options:ResetLayout() end)
-    createHint(general, L.hint, 20, -228, 560)
-    createSectionTitle(general, L.style, 18, -266)
-    self.barButton = createButton(general, L.bar, 90, 172, -260, function() Options:SetStyle("BAR") end)
-    self.iconButton = createButton(general, L.icon, 90, 267, -260, function() Options:SetStyle("ICON") end)
-    self.scaleSlider = createSlider(general, "BFAKeyAlertsScaleSlider", L.scale, 0.6, 1.6, 0.05, 22, -322, function(_, value)
-        if Options.updating then return end
-        BKA.db.layout.scale = math.floor(value * 20 + 0.5) / 20; BKA.Alerts:ApplyLayout(); Options:UpdateSliderLabels()
-    end)
-    self.widthSlider = createSlider(general, "BFAKeyAlertsWidthSlider", L.width, 280, 520, 10, 22, -386, function(_, value)
-        if Options.updating then return end
-        BKA.db.layout.width = math.floor(value / 10 + 0.5) * 10; BKA.Alerts:ApplyLayout(); Options:UpdateSliderLabels()
-    end)
-    general:SetScript("OnShow", function() Options:Refresh() end); self.generalPanel = general
-
-    -- Mechanics ---------------------------------------------------------------
-    local mechanics = createChildPanel(L.mechanics)
-    createTitle(mechanics, L.title .. " - " .. L.mechanics, L.mechanicsDescription)
-    createSectionTitle(mechanics, L.roleFilters, 18, -92)
-    self.tankCheck = createCheckbox(mechanics, L.tank, 18, -120, function(check)
-        BKA.db.showTankAlerts = check:GetChecked() and true or false; refreshCombatPresentation(true)
-    end)
-    self.healerCheck = createCheckbox(mechanics, L.healer, 18, -154, function(check)
-        BKA.db.showHealerAlerts = check:GetChecked() and true or false; refreshCombatPresentation(true)
-    end)
-    createSectionTitle(mechanics, L.seasonal, 18, -208)
-    self.infestedCheck = createCheckbox(mechanics, L.infested, 18, -236, function(check)
-        BKA.db.showInfestedAdds = check:GetChecked() and true or false; refreshCombatPresentation(true)
-    end)
-    mechanics:SetScript("OnShow", function() Options:Refresh() end); self.mechanicsPanel = mechanics
-
-    -- Nameplates --------------------------------------------------------------
-    local nameplates = createChildPanel(L.nameplates)
-    createTitle(nameplates, L.title .. " - " .. L.nameplates, L.nameplatesDescription)
-    createSectionTitle(nameplates, L.nameplateBehavior, 18, -92)
-    self.nameplatesEnabledCheck = createCheckbox(nameplates, L.enableNameplates, 18, -120, function(check)
-        BKA.db.showNameplates = check:GetChecked() and true or false
-        if BKA.db.showNameplates then BKA.Nameplates:RefreshAll() else BKA.Nameplates:Clear() end
-        BKA.Nameplates:RefreshClickTargeting()
-    end)
-    self.frontalTargetCheck = createCheckbox(nameplates, L.frontalTarget, 18, -154, function(check)
-        BKA.db.showFrontalTarget = check:GetChecked() and true or false; refreshCombatPresentation(false)
-    end)
-    self.clickableNameplateCheck = createCheckbox(nameplates, L.clickableNameplateAlerts, 18, -188, function(check)
-        BKA.db.clickableNameplateAlerts = check:GetChecked() and true or false; BKA.Nameplates:RefreshClickTargeting()
-    end)
-    nameplates:SetScript("OnShow", function() Options:Refresh() end); self.nameplatesPanel = nameplates
-
-    -- Group kicks -------------------------------------------------------------
-    local kicks = createChildPanel(L.kicks)
-    createTitle(kicks, L.title .. " - " .. L.kicks, L.kicksDescription)
-    self.kicksShownCheck = createCheckbox(kicks, L.showKickTracker, 18, -92, function(check)
-        BKA.db.kickTracker.shown = check:GetChecked() and true or false; BKA.GroupInterrupts:Refresh(true)
-    end)
-    self.kicksOnlyInKeyCheck = createCheckbox(kicks, L.onlyInKey, 18, -126, function(check)
-        BKA.db.kickTracker.onlyInKey = check:GetChecked() and true or false; BKA.GroupInterrupts:Refresh(true)
-    end)
-    createSectionTitle(kicks, L.kickTracker, 18, -168)
-    self.kicksLockButton = createButton(kicks, L.unlock, 145, 18, -194, function()
-        BKA.db.kickTracker.locked = not BKA.db.kickTracker.locked; BKA.GroupInterrupts:ApplySettings(); Options:UpdateButtons()
-    end)
-    self.kicksResetButton = createButton(kicks, L.reset, 170, 172, -194, function()
-        BKA.GroupInterrupts:ResetPosition(); Options:Refresh()
-    end)
-    self.kicksScaleSlider = createSlider(kicks, "BFAKeyAlertsKickScaleSlider", L.scale, 0.6, 2.0, 0.05, 22, -250, function(_, value)
-        if Options.updating then return end
-        BKA.db.kickTracker.scale = math.floor(value * 20 + 0.5) / 20; BKA.GroupInterrupts:ApplySettings(); Options:UpdateSliderLabels()
-    end)
-    self.kicksWidthSlider = createSlider(kicks, "BFAKeyAlertsKickWidthSlider", L.width, 280, 480, 10, 22, -308, function(_, value)
-        if Options.updating then return end
-        BKA.db.kickTracker.width = math.floor(value / 10 + 0.5) * 10; BKA.GroupInterrupts:ApplySettings(); BKA.GroupInterrupts:Refresh(true); Options:UpdateSliderLabels()
-    end)
-    self.kicksAlphaSlider = createSlider(kicks, "BFAKeyAlertsKickAlphaSlider", L.panelOpacity, 0.20, 1.00, 0.05, 22, -366, function(_, value)
-        if Options.updating then return end
-        BKA.db.kickTracker.alpha = math.floor(value * 20 + 0.5) / 20; BKA.GroupInterrupts:ApplySettings(); Options:UpdateSliderLabels()
-    end)
-    createHint(kicks, L.kickHint, 20, -420, 560)
-    kicks:SetScript("OnShow", function() Options:Refresh() end); self.kicksPanel = kicks
-
-    -- Keystone timer ----------------------------------------------------------
-    local keystone = createChildPanel(L.keystone)
-    createTitle(keystone, L.title .. " - " .. L.keystone, L.keystoneDescription)
-    self.keystoneShownCheck = createCheckbox(keystone, L.showKeystone, 18, -92, function(check)
-        BKA.db.keystoneHUD.shown = check:GetChecked() and true or false; BKA.KeystoneHUD:Refresh(true)
-    end)
-    self.hideBlizzardCheck = createCheckbox(keystone, L.hideBlizzard, 18, -126, function(check)
-        BKA.db.keystoneHUD.hideBlizzard = check:GetChecked() and true or false; BKA.KeystoneHUD:Refresh(true)
-    end)
-    self.keystoneLockButton = createButton(keystone, L.unlock, 145, 18, -170, function()
-        BKA.db.keystoneHUD.locked = not BKA.db.keystoneHUD.locked; BKA.KeystoneHUD:ApplySettings(); BKA.KeystoneHUD:Refresh(true); Options:UpdateButtons()
-    end)
-    self.keystoneResetButton = createButton(keystone, L.reset, 170, 172, -170, function()
-        BKA.KeystoneHUD:ResetPosition(); Options:Refresh()
-    end)
-    self.keystoneScaleSlider = createSlider(keystone, "BFAKeyAlertsKeyScaleSlider", L.scale, 0.6, 2.0, 0.05, 22, -236, function(_, value)
-        if Options.updating then return end
-        BKA.db.keystoneHUD.scale = math.floor(value * 20 + 0.5) / 20; BKA.KeystoneHUD:ApplySettings(); BKA.KeystoneHUD:Refresh(true); Options:UpdateSliderLabels()
-    end)
-    self.keystoneAlphaSlider = createSlider(keystone, "BFAKeyAlertsKeyAlphaSlider", L.opacity, 0, 1, 0.05, 22, -300, function(_, value)
-        if Options.updating then return end
-        BKA.db.keystoneHUD.backgroundAlpha = math.floor(value * 20 + 0.5) / 20; BKA.KeystoneHUD:ApplySettings(); Options:UpdateSliderLabels()
-    end)
-    createHint(keystone, L.keystoneHint, 20, -356, 560)
-    keystone:SetScript("OnShow", function() Options:Refresh() end); self.keystonePanel = keystone
-
-    -- Sounds ------------------------------------------------------------------
-    local sounds = createChildPanel(L.sounds)
-    createTitle(sounds, L.title .. " - " .. L.sounds, L.soundsDescription)
-    self.soundEnabledCheck = createCheckbox(sounds, L.globalSound, 18, -86, function(check) BKA.db.sound = check:GetChecked() and true or false end)
-    createSectionTitle(sounds, L.soundActions, 18, -130); createHint(sounds, L.soundHint, 18, -154, 570)
-    local actions = BKA.Sounds:GetActions(); self.soundChecks = {}
-    for index, action in ipairs(actions) do
-        local column, row = math.floor((index - 1) / 7), (index - 1) % 7
-        local x, y = 18 + column * 180, -178 - row * 31
-        local check = CreateFrame("CheckButton", nil, sounds, "UICheckButtonTemplate")
-        check:SetPoint("TOPLEFT", x, y); check:SetSize(24, 24)
-        check:SetScript("OnClick", function(button) BKA.db.soundActions[action] = button:GetChecked() and true or false end)
-        self.soundChecks[action] = check
-        createButton(sounds, BKA:LocalizeAction(action), 142, x + 28, y, function() BKA.Sounds:Preview(action) end)
+    self.frame = frame
+    buildGeneral(); buildMechanics(); buildNameplates(); buildKicks(); buildKeystone(); buildSounds()
+    for _, item in pairs(self.pages) do
+        item.child:SetHeight(math.max(465, -item.y + 16))
     end
-    createButton(sounds, L.resetCombatSounds, 190, 18, -416, function() BKA.Sounds:ResetActions(); Options:Refresh() end)
-    createButton(sounds, L.testAllSounds, 180, 218, -416, function() BKA.Sounds:PreviewAll() end)
-    sounds:SetScript("OnShow", function() Options:Refresh() end); self.soundsPanel = sounds
+    frame:SetScript("OnHide", function()
+        if BKA.Sounds then BKA.Sounds.previewGeneration = BKA.Sounds.previewGeneration + 1 end
+    end)
+    frame:Hide()
+    tinsert(UISpecialFrames, frame:GetName())
+    self:ShowSection("general")
+end
 
+function Options:ShowSection(section)
+    section = self.pages[section] and section or "general"
+    self.section = section
+    for key, item in pairs(self.pages) do item.scroll:SetShown(key == section) end
+    for key, nav in pairs(self.nav) do
+        nav.baseColor = key == section and {0.10, 0.22, 0.25, 0.95} or {0.025, 0.035, 0.055, 0.84}
+        nav:SetBackdropColor(unpack(nav.baseColor))
+        nav.text:SetTextColor(key == section and ACCENT[1] or 0.90, key == section and ACCENT[2] or 0.94, key == section and ACCENT[3] or 0.98)
+    end
     self:Refresh()
 end
 
 function Options:Refresh()
-    if not self.panel or not BKA.db then return end
+    if not self.frame or not BKA.db then return end
     self.updating = true
-    if self.enabledCheck then self.enabledCheck:SetChecked(BKA.db.enabled ~= false) end
-    if self.alertsEnabledCheck then self.alertsEnabledCheck:SetChecked(BKA.db.showAlerts ~= false) end
-    if self.nameplatesEnabledCheck then self.nameplatesEnabledCheck:SetChecked(BKA.db.showNameplates ~= false) end
-    if self.soundEnabledCheck then self.soundEnabledCheck:SetChecked(BKA.db.sound ~= false) end
-    if self.scaleSlider then self.scaleSlider:SetValue(BKA.db.layout.scale) end
-    if self.widthSlider then self.widthSlider:SetValue(BKA.db.layout.width) end
-    if self.tankCheck then self.tankCheck:SetChecked(BKA.db.showTankAlerts) end
-    if self.healerCheck then self.healerCheck:SetChecked(BKA.db.showHealerAlerts) end
-    if self.infestedCheck then self.infestedCheck:SetChecked(BKA.db.showInfestedAdds ~= false) end
-    if self.frontalTargetCheck then self.frontalTargetCheck:SetChecked(BKA.db.showFrontalTarget ~= false) end
-    if self.clickableNameplateCheck then self.clickableNameplateCheck:SetChecked(BKA.db.clickableNameplateAlerts ~= false) end
-
-    if self.kicksShownCheck then self.kicksShownCheck:SetChecked(BKA.db.kickTracker.shown ~= false) end
-    if self.kicksOnlyInKeyCheck then self.kicksOnlyInKeyCheck:SetChecked(BKA.db.kickTracker.onlyInKey == true) end
-    if self.kicksScaleSlider then self.kicksScaleSlider:SetValue(BKA.db.kickTracker.scale or 1) end
-    if self.kicksWidthSlider then self.kicksWidthSlider:SetValue(BKA.db.kickTracker.width or 320) end
-    if self.kicksAlphaSlider then self.kicksAlphaSlider:SetValue(BKA.db.kickTracker.alpha or 0.92) end
-    if self.keystoneShownCheck then self.keystoneShownCheck:SetChecked(BKA.db.keystoneHUD.shown ~= false) end
-    if self.hideBlizzardCheck then self.hideBlizzardCheck:SetChecked(BKA.db.keystoneHUD.hideBlizzard ~= false) end
-    if self.keystoneScaleSlider then self.keystoneScaleSlider:SetValue(BKA.db.keystoneHUD.scale or 1) end
-    if self.keystoneAlphaSlider then self.keystoneAlphaSlider:SetValue(BKA.db.keystoneHUD.backgroundAlpha or 0.75) end
-
-    for action, check in pairs(self.soundChecks or {}) do check:SetChecked(BKA.db.soundActions[action] ~= false) end
+    for _, refresh in ipairs(self.controls) do refresh() end
     self.updating = false
-    self:UpdateSliderLabels(); self:UpdateButtons()
-end
-
-function Options:UpdateSliderLabels()
-    if self.scaleSlider and self.scaleSlider.valueText then self.scaleSlider.valueText:SetFormattedText("%.2fx", BKA.db.layout.scale) end
-    if self.widthSlider and self.widthSlider.valueText then self.widthSlider.valueText:SetFormattedText("%d px", BKA.db.layout.width) end
-    if self.kicksScaleSlider and self.kicksScaleSlider.valueText then self.kicksScaleSlider.valueText:SetFormattedText("%.2fx", BKA.db.kickTracker.scale or 1) end
-    if self.kicksWidthSlider and self.kicksWidthSlider.valueText then self.kicksWidthSlider.valueText:SetFormattedText("%d px", BKA.db.kickTracker.width or 320) end
-    if self.kicksAlphaSlider and self.kicksAlphaSlider.valueText then self.kicksAlphaSlider.valueText:SetFormattedText("%d%%", math.floor((BKA.db.kickTracker.alpha or 0.92) * 100 + 0.5)) end
-    if self.keystoneScaleSlider and self.keystoneScaleSlider.valueText then self.keystoneScaleSlider.valueText:SetFormattedText("%.2fx", BKA.db.keystoneHUD.scale or 1) end
-    if self.keystoneAlphaSlider and self.keystoneAlphaSlider.valueText then self.keystoneAlphaSlider.valueText:SetFormattedText("%d%%", math.floor((BKA.db.keystoneHUD.backgroundAlpha or 0.75) * 100 + 0.5)) end
-end
-
-function Options:UpdateButtons()
-    if not self.panel then return end
-    if self.previewButton then self.previewButton:SetText(BKA.Alerts.previewVisible and L.hidePreview or L.preview) end
-    if self.moveButton then self.moveButton:SetText(BKA.Alerts.unlocked and L.lock or L.unlock) end
-    if self.barButton then self.barButton:SetText((BKA.db.alertStyle == "BAR" and "[ " or "") .. L.bar .. (BKA.db.alertStyle == "BAR" and " ]" or "")) end
-    if self.iconButton then self.iconButton:SetText((BKA.db.alertStyle == "ICON" and "[ " or "") .. L.icon .. (BKA.db.alertStyle == "ICON" and " ]" or "")) end
-    if self.kicksLockButton then self.kicksLockButton:SetText(BKA.db.kickTracker.locked == false and L.lock or L.unlock) end
-    if self.keystoneLockButton then self.keystoneLockButton:SetText(BKA.db.keystoneHUD.locked == false and L.lock or L.unlock) end
-end
-
-function Options:SetStyle(style)
-    BKA.db.alertStyle = style == "ICON" and "ICON" or "BAR"; BKA.Alerts:ApplyLayout(); self:UpdateButtons()
-end
-
-function Options:TogglePreview(forceShow, withSound)
-    if forceShow or not BKA.Alerts.previewVisible then BKA.Alerts:ShowPreview(withSound) else BKA.Alerts:HidePreview() end
-    self:UpdateButtons()
 end
 
 function Options:ResetLayout()
     local layout = BKA.db.layout
     layout.point, layout.relativePoint, layout.x, layout.y, layout.scale, layout.width = "TOP", "TOP", 0, -155, 1, 370
-    BKA.Alerts:ApplyLayout(); self:Refresh()
-end
-
-function Options:GetPanel(section)
-    if section == "general" then return self.generalPanel end
-    if section == "mechanics" then return self.mechanicsPanel end
-    if section == "nameplates" then return self.nameplatesPanel end
-    if section == "kicks" then return self.kicksPanel end
-    if section == "keystone" then return self.keystonePanel end
-    if section == "sounds" then return self.soundsPanel end
-    return self.generalPanel or self.panel
+    BKA.Alerts:ApplyLayout()
+    self:Refresh()
 end
 
 function Options:Open(section)
     self:Initialize()
-    local panel = self:GetPanel(section)
-    InterfaceOptionsFrame_OpenToCategory(panel)
-    InterfaceOptionsFrame_OpenToCategory(panel)
+    self:ShowSection(section or self.section or "general")
+    self.frame:Show()
 end

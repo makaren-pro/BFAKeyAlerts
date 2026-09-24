@@ -579,6 +579,10 @@ function BKA:DispatchAbility(ability, context)
         action = runtimeAction,
         soundHandled = true,
     }
+    if context.spellID == 257908 and context.event == "SPELL_AURA_APPLIED" then
+        alertContext.spellName = (GetSpellInfo(257908) or context.spellName or "") ..
+            "  |  " .. self:L("OILED_BLADE_FMT")
+    end
     if not suppressPresentation then
         if voiceAction and voiceAction ~= "NONE" and (not personalVoice or isPlayer) then
             self.Sounds:PlayMechanic(voiceAction, {
@@ -689,6 +693,9 @@ function BKA:HandleCombatLog()
             self.Logger:RecordUnknown(context)
         end
     end
+    if spellID == 209858 and event == "SPELL_PERIODIC_DAMAGE" then
+        self.Affixes:RecordNecroticTick(destGUID, tonumber(arg15))
+    end
     if self.Affixes:HandleCombatLog(event, spellID, spellName, destGUID, destName, amount) then
         return
     end
@@ -746,6 +753,9 @@ function BKA:OnEvent(event, ...)
             if self.GroupInterrupts and self.GroupInterrupts.Initialize then self.GroupInterrupts:Initialize() end
             if self.KeystoneHUD and self.KeystoneHUD.Initialize then self.KeystoneHUD:Initialize() end
             self.Options:Initialize()
+            if self.MinimapButton then self.MinimapButton:Initialize() end
+            if self.KeystoneAutoSlot then self.KeystoneAutoSlot:Initialize() end
+            if self.EnemyForces then self.EnemyForces:Initialize() end
             if self.Nameplates and self.Nameplates.RefreshClickTargeting then
                 self.Nameplates:RefreshClickTargeting()
             end

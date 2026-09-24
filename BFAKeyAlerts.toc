@@ -13,12 +13,14 @@ Version.lua
 HUD.lua
 GroupInterrupts.lua
 KeystoneHUD.lua
+KeystoneAutoSlot.lua
 InterruptPolicies.lua
 GeometryPolicies.lua
 Sounds.lua
 Alerts.lua
 Stacks.lua
 Options.lua
+Minimap.lua
 Timers.lua
 Targets.lua
 Logger.lua
@@ -37,5 +39,7 @@ Data/TheMotherlode.lua
 Data/TolDagor.lua
 Data/Underrot.lua
 Data/WaycrestManor.lua
+EnemyForcesData.lua
+EnemyForces.lua
 
 Engine.lua

@@ -53,6 +53,7 @@ function Stacks:OwnerAllows(rule, context)
 end
 
 function Stacks:ShouldWarn(rule, amount)
+    if rule.warnFirst and amount == 1 then return true end
     if rule.warnAbove and amount > rule.warnAbove then return true end
     local warnAt = rule.warnAt or 1
     if amount < warnAt then return false end
@@ -86,6 +87,13 @@ function Stacks:Handle(ability, context)
         return true
     end
 
+    local spellName = context.spellName or GetSpellInfo(spellID)
+    if rule.effectPercent and rule.effectKey then
+        local percent = amount * rule.effectPercent
+        spellName = (spellName or BKA:L("SPELL_FALLBACK", tostring(spellID))) .. "  |  " ..
+            (rule.effectDual and BKA:L(rule.effectKey, percent, percent) or BKA:L(rule.effectKey, percent))
+    end
+
     local criticalAt = tonumber(rule.criticalAt) or 0
     local severity = criticalAt > 0 and amount >= criticalAt and "CRITICAL" or ability.severity
     if (BKA.severityRank[severity] or 1) < 2 then severity = "MEDIUM" end
@@ -96,14 +104,14 @@ function Stacks:Handle(ability, context)
     }
     BKA.Alerts:Show(copyAbility(ability, severity), {
         key = key, sourceGUID = context.sourceGUID, destGUID = context.destGUID,
-        spellID = spellID, spellName = context.spellName, targetName = context.destName,
+        spellID = spellID, spellName = spellName, targetName = context.destName,
         isPlayer = isPlayer, targetConfidence = "CONFIRMED", action = action, stackAmount = amount,
         persistent = true, silent = true, soundHandled = true,
     })
 
     if self:ShouldWarn(rule, amount) then
         local voice = rule.voiceAction or ability.voiceAction or action
-        if voice and voice ~= "NONE" then
+        if voice and voice ~= "NONE" and (voice ~= "YOU" or isPlayer) then
             BKA.Sounds:PlayMechanic(voice, {
                 sourceGUID = context.sourceGUID, spellID = spellID, key = key .. ":" .. amount,
                 isPlayer = isPlayer, targetConfidence = "CONFIRMED", criticalPersonal = isPlayer and severity == "CRITICAL",

@@ -133,7 +133,7 @@ function Alerts:Initialize()
     self.anchor.guide:Hide()
     self.anchor.guideText = self.anchor:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     self.anchor.guideText:SetPoint("BOTTOM", self.anchor, "TOP", 0, 18)
-    self.anchor.guideText:SetText("BFA Key Alerts - " .. BKA:L("DRAG"))
+    self.anchor.guideText:SetText(BKA:L("ADDON_TITLE") .. " - " .. BKA:L("DRAG"))
     self.anchor.guideText:SetTextColor(0.25, 0.78, 1)
     self.anchor.guideText:Hide()
     self.anchor:SetScript("OnDragStart", function(frame) frame:StartMoving() end)
@@ -464,15 +464,15 @@ function Alerts:ShowPreview(withSound)
     self:HidePreview()
     self:SetUnlocked(true)
     local now = GetTime()
-    local playerName = UnitName("player") or "Player"
+    local playerName = UnitName("player") or BKA:L("PREVIEW_PLAYER")
     local previews = {
-        { id = 257337, action = "FRONTAL", severity = "HIGH", spell = "Fixed frontal", frontalBehavior = "FIXED_FORWARD" },
-        { id = 264923, action = "FRONTAL", severity = "HIGH", spell = "Frontal on teammate", frontalBehavior = "SNAPSHOT_TARGET", target = "Tank-Realm", targetRole = "TANK", confirmed = true },
-        { id = 264923, action = "FRONTAL", severity = "CRITICAL", spell = "Personal locked frontal", frontalBehavior = "SNAPSHOT_TARGET", target = playerName, personal = true, confirmed = true },
-        { id = 258864, action = "FRONTAL", severity = "CRITICAL", spell = "Personal tracking frontal", frontalBehavior = "TRACK_TARGET", target = playerName, personal = true, confirmed = true },
-        { id = 258864, action = "FRONTAL", severity = "HIGH", spell = "Frontal prediction", frontalBehavior = "TRACK_TARGET", state = "PREWARN" },
-        { id = 255371, action = "KICK", severity = "HIGH", spell = "Active interrupt" },
-        { id = 269972, action = "AOE", severity = "HIGH", spell = "Group damage" },
+        { id = 257337, action = "FRONTAL", severity = "HIGH", spell = BKA:L("PREVIEW_FIXED_FRONTAL"), frontalBehavior = "FIXED_FORWARD" },
+        { id = 264923, action = "FRONTAL", severity = "HIGH", spell = BKA:L("PREVIEW_TEAM_FRONTAL"), frontalBehavior = "SNAPSHOT_TARGET", target = BKA:L("PREVIEW_TANK"), targetRole = "TANK", confirmed = true },
+        { id = 264923, action = "FRONTAL", severity = "CRITICAL", spell = BKA:L("PREVIEW_LOCKED_FRONTAL"), frontalBehavior = "SNAPSHOT_TARGET", target = playerName, personal = true, confirmed = true },
+        { id = 258864, action = "FRONTAL", severity = "CRITICAL", spell = BKA:L("PREVIEW_TRACKING_FRONTAL"), frontalBehavior = "TRACK_TARGET", target = playerName, personal = true, confirmed = true },
+        { id = 258864, action = "FRONTAL", severity = "HIGH", spell = BKA:L("PREVIEW_FRONTAL_SOON"), frontalBehavior = "TRACK_TARGET", state = "PREWARN" },
+        { id = 255371, action = "KICK", severity = "HIGH", spell = BKA:L("PREVIEW_INTERRUPT") },
+        { id = 269972, action = "AOE", severity = "HIGH", spell = BKA:L("PREVIEW_GROUP_DAMAGE") },
     }
     for index, preview in ipairs(previews) do
         self:Show({ id = preview.id, action = preview.action, mechanic = preview.action, severity = preview.severity, center = true, sound = false, role = "ALL", frontalBehavior = preview.frontalBehavior }, {

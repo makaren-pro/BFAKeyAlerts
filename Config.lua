@@ -18,6 +18,9 @@ BKA.defaults = {
     showInfestedAdds = true,
     showFrontalTarget = true,
     clickableNameplateAlerts = true,
+    autoInsertKeystone = true,
+    showEnemyForcesTooltip = true,
+    minimap = { angle = 225, hide = false },
     kickTracker = {
         shown = true, locked = true, scale = 1, width = 320, alpha = 0.92, onlyInKey = false,
         point = "CENTER", relativePoint = "CENTER", x = 350, y = -160,
@@ -56,7 +59,7 @@ function BKA:InitDB()
     for key, value in pairs(self.defaults.soundActions) do
         if self.db.soundActions[key] == nil then self.db.soundActions[key] = value end
     end
-    local nested = { "layout", "kickTracker", "keystoneHUD" }
+    local nested = { "layout", "kickTracker", "keystoneHUD", "minimap" }
     for _, tableKey in ipairs(nested) do
         if type(self.db[tableKey]) ~= "table" then self.db[tableKey] = {} end
         for key, value in pairs(self.defaults[tableKey]) do

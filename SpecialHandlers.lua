@@ -355,7 +355,7 @@ function Special:StartEncounterTimers()
     elseif id == 2096 then
         schedule(257278, 11, guid)
         schedule(257305, 20, guid)
-        schedule(257316, 84.4, guid, "Next adds")
+        schedule(257316, 84.4, guid, BKA:L("NEXT_ADDS"))
     elseif id == 2140 then
         self:HandleEngageUnits()
     elseif id == 2097 or id == 2098 then
@@ -370,7 +370,7 @@ function Special:StartEncounterTimers()
     elseif id == 2100 then
         schedule(275014, 5, guid)
         schedule(270185, 6, guid)
-        schedule(270605, 20, guid, "Demolishing Terror 2", { id = 270605, action = "ADD", center = true })
+        schedule(270605, 20, guid, BKA:L("DEMOLISHING_TERROR") .. " 2", { id = 270605, action = "ADD", center = true })
     elseif id == 2107 then
         schedule(270028, 4, guid, nil, { mechanic = "DODGE", action = "MOVE", severity = "HIGH", center = true })
         schedule(259853, 12.5, guid)
@@ -466,7 +466,7 @@ function Special:HandleEngageUnits()
                 schedule(267060, 20, "council")
             end
             if stage > 1 then
-                show(0, { spellName = "Council stage", targetName = tostring(stage), key = "council-stage:" .. stage }, { id = 0, action = "STAGE", severity = "MEDIUM", center = true })
+                show(0, { spellName = BKA:L("COUNCIL_STAGE"), targetName = tostring(stage), key = "council-stage:" .. stage }, { id = 0, action = "STAGE", severity = "MEDIUM", center = true })
                 startCouncilTimer(self.state.councilOrder[1], 15.8)
                 if stage == 3 then startCouncilTimer(self.state.councilOrder[2], 48.1) end
             end
@@ -484,17 +484,17 @@ function Special:HandleEngageUnits()
                 self.state.dazarMobs[guid] = true
                 local npcID = BKA:GetNPCID(guid)
                 if npcID == 136984 then
-                    show(269231, { sourceGUID = guid, spellName = "Reban", targetName = "SPAWNED", key = "dazar-reban" }, { action = "ADD", severity = "MEDIUM", center = true })
+                    show(269231, { sourceGUID = guid, spellName = BKA:L("REBAN"), targetName = BKA:L("SPAWNED"), key = "dazar-reban" }, { action = "ADD", severity = "MEDIUM", center = true })
                     schedule(269231, 5, guid)
                 elseif npcID == 136976 then
-                    show(269369, { sourceGUID = guid, spellName = "T'zala", targetName = "SPAWNED", key = "dazar-tzala" }, { action = "ADD", severity = "MEDIUM", center = true })
+                    show(269369, { sourceGUID = guid, spellName = BKA:L("TZALA"), targetName = BKA:L("SPAWNED"), key = "dazar-tzala" }, { action = "ADD", severity = "MEDIUM", center = true })
                     schedule(269369, 8.5, guid)
                 end
             end
         end
     elseif id == 2100 and not self.state.engagedGripping and bossGUID(137405) then
         self.state.engagedGripping = true
-        schedule(270605, 20, "viq", "Demolishing Terror 2", { id = 270605, action = "ADD", center = true })
+        schedule(270605, 20, "viq", BKA:L("DEMOLISHING_TERROR") .. " 2", { id = 270605, action = "ADD", center = true })
     end
 end
 
@@ -513,7 +513,7 @@ function Special:HandleUnitEvent(event, unit, spellID)
             show(268796, { sourceGUID = guid, spellName = GetSpellInfo(268796), key = "dazar-spears" }, { action = "SPEARS ACTIVE", severity = "HIGH", center = true, sound = true })
         elseif id == 2093 and spellID == 256056 then
             BKA.Timers:CancelAbility(255952)
-            show(256056, { spellName = "Stage 2", key = "kragg-stage-2" }, { id = 256056, action = "STAGE 2", severity = "MEDIUM", center = true, sound = true })
+            show(256056, { spellName = BKA:L("STAGE_TWO"), key = "kragg-stage-2" }, { id = 256056, action = "STAGE 2", severity = "MEDIUM", center = true, sound = true })
             schedule(256106, 7, guid)
             schedule(256005, 6, guid)
             schedule(272046, 17, guid)
@@ -540,7 +540,7 @@ function Special:HandleUnitEvent(event, unit, spellID)
             schedule(268260, 11.2, guid)
         elseif id == 2109 and spellID == 268745 and self.state.withdrawn then
             self.state.withdrawn = false
-            show(268752, { sourceGUID = guid, spellName = GetSpellInfo(268752), targetName = "OVER", key = "withdraw-over" }, { action = "RESUME", severity = "MEDIUM", center = true })
+            show(268752, { sourceGUID = guid, spellName = GetSpellInfo(268752), targetName = BKA:L("OVER"), key = "withdraw-over" }, { action = "RESUME", severity = "MEDIUM", center = true })
             schedule(269029, 7, guid)
             schedule(268752, 35.7, guid)
         elseif id == 2109 and spellID == 268963 then
@@ -557,15 +557,15 @@ function Special:HandleUnitEvent(event, unit, spellID)
             if self.state.viqStage < 4 then
                 self.state.engagedGripping = false
                 self.state.demolisherCount = 1
-                show(269984, { spellName = "Viq'Goth stage", targetName = tostring(self.state.viqStage), key = "viq-stage:" .. self.state.viqStage }, { action = "STAGE", severity = "MEDIUM", center = true })
+                show(269984, { spellName = BKA:L("VIQ_GOTH_STAGE"), targetName = tostring(self.state.viqStage), key = "viq-stage:" .. self.state.viqStage }, { action = "STAGE", severity = "MEDIUM", center = true })
             end
         elseif id == 2100 and spellID == 270605 then
             self.state.demolisherCount = (self.state.demolisherCount or 1) + 1
             local count = self.state.demolisherCount
             if count <= 5 then
-                show(270605, { spellName = "Demolishing Terror", targetName = tostring(count), key = "demolisher:" .. count }, { id = 270605, action = "ADD", severity = "HIGH", center = true, sound = true })
+                show(270605, { spellName = BKA:L("DEMOLISHING_TERROR"), targetName = tostring(count), key = "demolisher:" .. count }, { id = 270605, action = "ADD", severity = "HIGH", center = true, sound = true })
             end
-            if count <= 4 then schedule(270605, 20, "viq", "Demolishing Terror " .. (count + 1), { id = 270605, action = "ADD", center = true }) end
+            if count <= 4 then schedule(270605, 20, "viq", BKA:L("DEMOLISHING_TERROR") .. " " .. (count + 1), { id = 270605, action = "ADD", center = true }) end
         end
     elseif event == "UNIT_SPELLCAST_START" then
         if BKA.activeDungeon.key == "SiegeOfBoralus" and not id and spellID == 272711 then
@@ -611,7 +611,7 @@ function Special:HandleUnitEvent(event, unit, spellID)
         end
     elseif event == "UNIT_TARGETABLE_CHANGED" and id == 2125 and string.match(unit or "", "^boss%d$") then
         if UnitCanAttack("player", unit) then
-            show(264206, { sourceGUID = guid, spellName = GetSpellInfo(264206), targetName = "OVER", key = "burrow-over" }, { action = "RESUME", severity = "MEDIUM", center = true })
+            show(264206, { sourceGUID = guid, spellName = GetSpellInfo(264206), targetName = BKA:L("OVER"), key = "burrow-over" }, { action = "RESUME", severity = "MEDIUM", center = true })
             schedule(263914, 6, guid)
             schedule(263958, 8, guid)
         else
@@ -642,7 +642,7 @@ function Special:HandleCombatLog(event, context)
             schedule(257305, 17, context.sourceGUID)
             if self.state.harlanStage == 3 then
                 local remaining = BKA.Timers:GetRemaining(257316)
-                if remaining > 2.4 then schedule(257316, remaining - 2.4, context.sourceGUID, "Next adds") end
+                if remaining > 2.4 then schedule(257316, remaining - 2.4, context.sourceGUID, BKA:L("NEXT_ADDS")) end
             end
         elseif event == "SPELL_CAST_SUCCESS" and context.spellID == 257278 then
             show(257278, context, { action = "DODGE", severity = "MEDIUM", center = true })
@@ -679,7 +679,7 @@ function Special:HandleCombatLog(event, context)
             end
         elseif event == "SPELL_AURA_APPLIED" and context.spellID == 257314 and context.sourceGUID ~= context.destGUID then
             show(257314, { sourceGUID = context.sourceGUID, spellName = context.spellName, targetName = context.destName, isPlayer = context.destGUID == UnitGUID("player"), targetConfidence = "CONFIRMED", key = "black-powder:" .. tostring(context.destGUID) }, { action = "FIXATE", severity = context.destGUID == UnitGUID("player") and "CRITICAL" or "HIGH", center = true, sound = true })
-            schedule(257316, (self.state.harlanStage or 1) == 3 and 18.2 or 20.6, context.sourceGUID, "Next adds")
+            schedule(257316, (self.state.harlanStage or 1) == 3 and 18.2 or 20.6, context.sourceGUID, BKA:L("NEXT_ADDS"))
         end
     elseif id == 2100 and context.spellID == 275014 then
         local targets = self.state.putridWatersTargets
@@ -748,7 +748,7 @@ function Special:HandleCombatLog(event, context)
             self.state.lastBombAt = now
             self.state.bombsRemaining = math.max(0, (self.state.bombsRemaining or 0) - 1)
             local bombID = id == 2098 and 273721 or 277965
-            show(bombID, { spellName = GetSpellInfo(bombID), targetName = tostring(self.state.bombsRemaining) .. " remaining", key = "bombs:" .. self.state.bombsRemaining }, { action = "ORDNANCE", severity = "MEDIUM", center = true })
+            show(bombID, { spellName = GetSpellInfo(bombID), targetName = BKA:L("REMAINING_COUNT_FMT", self.state.bombsRemaining), key = "bombs:" .. self.state.bombsRemaining }, { action = "ORDNANCE", severity = "MEDIUM", center = true })
         end
     elseif id == 2124 and event == "SPELL_CAST_START" and context.spellID == 263309 then
         self.state.cycloneStrikeCount = (self.state.cycloneStrikeCount or 0) + 1
@@ -760,13 +760,13 @@ function Special:HandleCombatLog(event, context)
             self.state.avatarStage = (self.state.avatarStage or 0) + 1
             self.state.hexerCount = 4
             local stage = self.state.avatarStage
-            if stage > 1 then show(273677, { spellName = "Intermission over", key = "avatar-stage:" .. stage }, { action = "STAGE", severity = "MEDIUM", center = true }) end
-            schedule(268007, stage == 3 and 2.5 or 3.5, "avatar", "Heart Guardian", { action = "ADD", center = true })
+            if stage > 1 then show(273677, { spellName = BKA:L("INTERMISSION_OVER"), key = "avatar-stage:" .. stage }, { action = "STAGE", severity = "MEDIUM", center = true }) end
+            schedule(268007, stage == 3 and 2.5 or 3.5, "avatar", BKA:L("HEART_GUARDIAN"), { action = "ADD", center = true })
             if stage == 3 then
-                schedule(268008, 3.5, "avatar-doctor-1", "Plague Doctor", { action = "ADD", center = true })
-                C_Timer.After(3.5, function() if BKA.active and Special.state.encounterID == 2127 then schedule(268008, 6, "avatar-doctor-2", "Plague Doctor", { action = "ADD", center = true }) end end)
+                schedule(268008, 3.5, "avatar-doctor-1", BKA:L("PLAGUE_DOCTOR"), { action = "ADD", center = true })
+                C_Timer.After(3.5, function() if BKA.active and Special.state.encounterID == 2127 then schedule(268008, 6, "avatar-doctor-2", BKA:L("PLAGUE_DOCTOR"), { action = "ADD", center = true }) end end)
             else
-                schedule(268008, 16.5, "avatar", "Plague Doctor", { action = "ADD", center = true })
+                schedule(268008, 16.5, "avatar", BKA:L("PLAGUE_DOCTOR"), { action = "ADD", center = true })
             end
         end
     elseif id == 2126 and event == "SPELL_AURA_APPLIED_DOSE" and context.spellID == 266923 and context.destGUID == UnitGUID("player") and context.amount and context.amount % 3 == 0 then
@@ -781,9 +781,9 @@ function Special:HandleDeath(destGUID, destName)
     elseif self.state.encounterID == 2127 and npcID == 137204 then
         self.state.hexerCount = math.max(0, (self.state.hexerCount or 4) - 1)
         if self.state.hexerCount > 0 then
-            show(137204, { spellName = destName or "Hoodoo Hexer", targetName = tostring(self.state.hexerCount) .. " remaining", key = "hexers:" .. self.state.hexerCount }, { id = 137204, action = "ADDS", severity = "MEDIUM", center = true })
+            show(137204, { spellName = destName or BKA:L("HOODOO_HEXER"), targetName = BKA:L("REMAINING_COUNT_FMT", self.state.hexerCount), key = "hexers:" .. self.state.hexerCount }, { id = 137204, action = "ADDS", severity = "MEDIUM", center = true })
         elseif self.state.avatarStage ~= 3 then
-            show(137204, { spellName = "Intermission", key = "avatar-intermission" }, { id = 137204, action = "INTERMISSION", severity = "MEDIUM", center = true })
+            show(137204, { spellName = BKA:L("INTERMISSION"), key = "avatar-intermission" }, { id = 137204, action = "INTERMISSION", severity = "MEDIUM", center = true })
             BKA.Timers:CancelAbility(268024)
         end
     end
