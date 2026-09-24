@@ -679,13 +679,13 @@ function Nameplates:Render(unit)
 end
 
 function Nameplates:ShowPrediction(unit, prediction, ability)
-    if not unit or type(prediction) ~= "table" or not BKA.db or BKA.db.showNameplates == false then return end
+    if not unit or type(prediction) ~= "table" or not BKA.db or BKA.db.showNameplates == false then return false end
     local guid = UnitGUID(unit)
     local sourceGUID = prediction.sourceGUID or prediction.guid
-    if not guid or (sourceGUID and guid ~= sourceGUID) then return end
+    if not guid or (sourceGUID and guid ~= sourceGUID) then return false end
     local overlay = self:GetOverlay(unit)
-    if not overlay or overlay.ownerGUID ~= guid then return end
-    if overlay.predictionState and overlay.predictionState.predictionData == prediction then return end
+    if not overlay or overlay.ownerGUID ~= guid then return false end
+    if overlay.predictionState and overlay.predictionState.predictionData == prediction then return true end
     local action = BKA:NormalizeAction(prediction.action or ability and (ability.nameplateAction or ability.action) or "CAST", ability and ability.mechanic)
     overlay.predictionState = {
         prediction = true, sourceGUID = sourceGUID or guid, spellID = prediction.spellID,
@@ -700,6 +700,7 @@ function Nameplates:ShowPrediction(unit, prediction, ability)
     }
     if not overlay.predictionState.expectedTime then overlay.predictionState.expectedTime = GetTime() end
     self:Render(unit)
+    return overlay.predictionState and overlay.predictionState.predictionData == prediction
 end
 
 function Nameplates:HidePrediction(unit, guid)

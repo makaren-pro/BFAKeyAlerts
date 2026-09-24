@@ -27,8 +27,8 @@ function UI:Show(unit, prediction, ability)
         return true
     end
     self.predictions[sourceGUID] = { unit = unit, guid = sourceGUID, prediction = prediction, ability = ability }
-    if BKA.Nameplates then BKA.Nameplates:ShowPrediction(unit, prediction, ability) end
-    return true
+    if not BKA.Nameplates then return false end
+    return BKA.Nameplates:ShowPrediction(unit, prediction, ability) == true
 end
 
 function UI:Hide(unit, guid)

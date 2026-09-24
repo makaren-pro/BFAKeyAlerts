@@ -284,6 +284,7 @@ local function buildPrediction()
     heading(p, "CP_SETTINGS")
     toggle(p, "castLearning.enabled", "CP_ENABLED", "CP_ENABLED_DESC")
     toggle(p, "castLearning.predictions", "CP_PREDICTIONS", "CP_PREDICTIONS_DESC")
+    toggle(p, "castLearning.showPredictionAlerts", "CP_PREDICTION_ALERTS", "CP_PREDICTION_ALERTS_DESC")
     toggle(p, "castLearning.importantOnly", "CP_IMPORTANT", "CP_IMPORTANT_DESC")
     toggle(p, "castLearning.debug", "CP_DEBUG", "CP_DEBUG_DESC")
     slider(p, "castLearning.leadTime", "CP_LEAD_TIME", 0.3, 3.0, 0.1, "%.1fs")
@@ -299,7 +300,7 @@ local function buildPrediction()
         statsText:SetText(BKA:L("CP_STATS_FMT", tostring(stats.dungeonID or "-"),
             tonumber(stats.observations) or 0, tonumber(stats.npcs) or 0,
             tonumber(stats.spells) or 0, tonumber(stats.entries) or 0,
-            tonumber(stats.highConfidence) or 0,
+            tonumber(stats.created) or 0, tonumber(stats.displayed) or 0,
             tonumber(stats.hits) or 0, tonumber(stats.misses) or 0, accuracy))
     end
     p.y = p.y - 65
@@ -310,7 +311,7 @@ local function buildPrediction()
             BKA.CastPredictionUI:ShowExport(text)
         end})
     heading(p, "CP_PREVIEW")
-    local preview = panel(p.child, 12, p.y, 580, 94, 0.47)
+    local preview = panel(p.child, 12, p.y, 580, 147, 0.47)
     label(preview, 10, 12, -5, 550, BKA:L("OPT_ENEMY"), {0.62, 0.71, 0.77})
     local ghost = panel(preview, 12, -29, 260, 48, 0.45)
     local real = panel(preview, 294, -29, 270, 48, 0.78)
@@ -323,7 +324,14 @@ local function buildPrediction()
     realIcon:SetTexture("Interface\\Icons\\Ability_Kick")
     label(ghost, 10, 42, -8, 208, BKA:L("CP_GHOST_PREVIEW") .. " " .. BKA:LocalizeAction("KICK") .. "  ~0.8", ACCENT)
     label(real, 10, 42, -8, 218, BKA:L("CP_REAL_PREVIEW") .. " " .. BKA:LocalizeAction("KICK") .. "  0.8", ACCENT)
-    p.y = p.y - 102
+    local central = panel(preview, 12, -84, 552, 45, 0.78)
+    central:SetAlpha(0.42)
+    local centralIcon = central:CreateTexture(nil, "ARTWORK")
+    centralIcon:SetSize(29, 29); centralIcon:SetPoint("LEFT", 8, 0)
+    centralIcon:SetTexture("Interface\\Icons\\Ability_Kick"); centralIcon:SetDesaturated(true)
+    label(central, 11, 47, -7, 440, BKA:L("CP_ALERT_PREVIEW") .. "  " .. BKA:LocalizeAction("KICK") .. "  -  " .. (GetSpellInfo(255371) or BKA:L("CP_GHOST_PREVIEW")), ACCENT)
+    label(central, 14, 492, -12, 52, "~0.8", ACCENT)
+    p.y = p.y - 155
 end
 
 local function buildKicks()

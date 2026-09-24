@@ -6,6 +6,7 @@ local MAX_ROWS = 7
 local BAR_HEIGHT, ICON_SIZE, ROW_GAP = 45, 64, 7
 
 local function alertRank(ability, state, personal, persistent)
+    if state == "PREDICTED" then return 0 end
     local severity = BKA.severityRank[ability and ability.severity] or 1
     if personal and state == "ACTIVE" then return 7000 + severity end
     if state == "ACTIVE" and severity >= BKA.severityRank.CRITICAL then return 6000 + severity end
@@ -194,6 +195,7 @@ function Alerts:Release(row)
     row.key, row.preview, row.ownerUnit, row.ownerGeneration = nil, nil, nil, nil
     row.sourceGUID, row.spellID, row.baseAction, row.spellName = nil, nil, nil, nil
     row.alertState, row.stackAmount, row.persistent, row.personal = nil, nil, nil, nil
+    row.prediction = nil
     row.targetConfidence, row.targetName, row.targetRole, row.targetIsPlayer, row.presentationTier = nil, nil, nil, nil, nil
     row.glow.anim:Stop()
     row.glow:Hide()
@@ -344,6 +346,47 @@ function Alerts:Hide(key, ownerGeneration)
     end
 end
 
+function Alerts:ShowPrediction(prediction)
+    if not prediction or not prediction.ability or not BKA.db or BKA.db.showAlerts == false or
+        not BKA.db.castLearning or BKA.db.castLearning.showPredictionAlerts == false then return false end
+    local guid, spellID = prediction.sourceGUID or prediction.guid, prediction.spellID
+    if not guid or not spellID then return false end
+    for _, row in ipairs(self.rows or {}) do
+        if row:IsShown() and row.alertState ~= "PREDICTED" and not row.preview and
+            row.sourceGUID == guid and row.spellID == spellID then return false end
+    end
+    local key = "prediction:" .. tostring(guid)
+    local row = self:Show(prediction.ability, {
+        key = key, sourceGUID = guid, spellID = spellID, action = prediction.action,
+        alertState = "PREDICTED", forceCenter = true, silent = true,
+        startTime = GetTime(), endTime = prediction.expectedTime,
+        expires = prediction.expectedTime + (tonumber(prediction.lateWindow) or 0),
+    })
+    if row then
+        row.prediction = prediction
+        prediction.alertKey, prediction.alertRow = key, row
+        return true
+    end
+    return false
+end
+
+function Alerts:SyncPrediction(prediction)
+    local row = prediction and prediction.alertRow
+    if not row or not row:IsShown() or row.prediction ~= prediction then return false end
+    if row.endTime ~= prediction.expectedTime then
+        row.endTime = prediction.expectedTime
+        row.icon.cooldown:SetCooldown(row.startTime, math.max(0.01, row.endTime - row.startTime))
+    end
+    row.expires = prediction.expectedTime + (tonumber(prediction.lateWindow) or 0)
+    return true
+end
+
+function Alerts:HidePrediction(prediction)
+    if not prediction then return end
+    if prediction.alertKey then self:Hide(prediction.alertKey) end
+    prediction.alertKey, prediction.alertRow, prediction.alertShown = nil, nil, nil
+end
+
 function Alerts:HidePrewarning(abilityID, sourceGUID)
     local removed = false
     for _, row in ipairs(self.rows or {}) do
@@ -388,14 +431,19 @@ function Alerts:Show(ability, context)
     local personal = BKA:IsConfirmedPersonal(context)
     if (normalizedAction == "FRONTAL" or normalizedAction == "CLEAVE") and not BKA:IsTargetBasedFrontal(ability) then personal = false end
     if context.alertState == "PREWARN" then personal = false end
-    local shouldCenter, promoted = BKA:ShouldCenterAbility(ability, context.action, context)
+    local shouldCenter, promoted
+    if context.alertState == "PREDICTED" then
+        shouldCenter = true
+    else
+        shouldCenter, promoted = BKA:ShouldCenterAbility(ability, context.action, context)
+    end
     if context.forceCenter then shouldCenter = true end
     if (not BKA.db.enabled and not context.preview) or (not context.preview and not shouldCenter) then return end
     if promoted and not context.safetyNetCounted then
         BKA.diagnostics.centerSafetyNetPromotions = BKA.diagnostics.centerSafetyNetPromotions + 1
         context.safetyNetCounted = true
     end
-    if not context.preview and BKA.RoleCenterAllows and not BKA:RoleCenterAllows(ability, personal, context.action) then return end
+    if not context.preview and context.alertState ~= "PREDICTED" and BKA.RoleCenterAllows and not BKA:RoleCenterAllows(ability, personal, context.action) then return end
     -- Center visibility is independent from combat audio. If a caller delegates
     -- sound playback to Alerts:Show, preserve that sound even when the visual
     -- alert layer is disabled. Callers that already played audio set soundHandled.
@@ -411,6 +459,14 @@ function Alerts:Show(ability, context)
     end
     self:Initialize()
     local state = context.alertState or "ACTIVE"
+    if state ~= "PREDICTED" and not context.preview and context.sourceGUID then
+        local spellID = context.spellID or ability.id
+        for _, predictedRow in ipairs(self.rows) do
+            if predictedRow.prediction and predictedRow.sourceGUID == context.sourceGUID and predictedRow.spellID == spellID then
+                self:HidePrediction(predictedRow.prediction)
+            end
+        end
+    end
     local rank = alertRank(ability, state, personal, context.persistent)
     local key = context.key or self:GetKey(ability, context)
     local row = self:Acquire(rank, key)
@@ -435,14 +491,14 @@ function Alerts:Show(ability, context)
     row.startTime = context.startTime or GetTime()
     row.endTime = context.endTime
     local severityRank = BKA.severityRank[ability.severity] or 1
-    row.expires = context.persistent and math.huge or context.endTime or (GetTime() + (context.duration or (severityRank >= 3 and 3.2 or 2.2)))
+    row.expires = context.persistent and math.huge or context.expires or context.endTime or (GetTime() + (context.duration or (severityRank >= 3 and 3.2 or 2.2)))
     row.bar.icon:SetTexture(texture)
     row.icon.texture:SetTexture(texture)
     row.bar.progress:SetStatusBarColor(color[1], color[2], color[3], 1)
-    local prewarn = state == "PREWARN"
-    row:SetAlpha(prewarn and 0.48 or 1)
-    row.bar.icon:SetDesaturated(prewarn)
-    row.icon.texture:SetDesaturated(prewarn)
+    local prewarn, predicted = state == "PREWARN", state == "PREDICTED"
+    row:SetAlpha(predicted and 0.42 or prewarn and 0.48 or 1)
+    row.bar.icon:SetDesaturated(prewarn or predicted)
+    row.icon.texture:SetDesaturated(prewarn or predicted)
     self:ApplyPresentation(row, color)
     if row.endTime then row.icon.cooldown:SetCooldown(row.startTime, math.max(0.01, row.endTime - row.startTime)) else row.icon.cooldown:SetCooldown(0, 0) end
     row:Show()
@@ -457,6 +513,7 @@ function Alerts:Show(ability, context)
     end
     self:SortRows()
     self:UpdateDriver()
+    return row
 end
 
 function Alerts:ShowPreview(withSound)
@@ -523,8 +580,9 @@ function Alerts:OnUpdate()
                 if row.endTime then
                     local remaining = math.max(0, row.endTime - now)
                     local duration = math.max(0.01, row.endTime - row.startTime)
-                    row.bar.countdown:SetFormattedText("%.1f", remaining)
-                    row.icon.countdown:SetFormattedText("%.1f", remaining)
+                    local format = row.alertState == "PREDICTED" and "~%.1f" or "%.1f"
+                    row.bar.countdown:SetFormattedText(format, remaining)
+                    row.icon.countdown:SetFormattedText(format, remaining)
                     row.bar.progress:SetMinMaxValues(0, duration)
                     row.bar.progress:SetValue(remaining)
                     row.bar.progress:Show()

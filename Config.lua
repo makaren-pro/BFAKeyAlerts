@@ -39,8 +39,8 @@ BKA.defaults = {
     },
     firestorm = {},
     castLearning = {
-        version = 1, enabled = true, predictions = true, importantOnly = true,
-        leadTime = 1.0, minimumSamples = 5, minimumConfidence = 0.85,
+        version = 1, enabled = true, predictions = true, showPredictionAlerts = true, importantOnly = false,
+        leadTime = 3.0, minimumSamples = 5, minimumConfidence = 0.85,
         debug = false,
     },
 }
@@ -144,7 +144,8 @@ SlashCmdList.BFAKEYALERTS = function(input)
         if subcommand == "status" then
             local summary = learner:GetSummary()
             BKA:Print(BKA:L("LEARN_STATUS_FMT", tostring(summary.dungeonID or "-"), summary.observations,
-                summary.npcs, summary.spells, summary.hits, summary.misses, summary.accuracy * 100))
+                summary.npcs, summary.spells, summary.created, summary.displayed,
+                summary.hits, summary.misses, summary.accuracy * 100))
         elseif subcommand == "debug" and (detail == "on" or detail == "off") then
             BKA.db.castLearning.debug = detail == "on"
             if BKA.Nameplates then BKA.Nameplates:RefreshAll() end
@@ -156,7 +157,11 @@ SlashCmdList.BFAKEYALERTS = function(input)
         elseif subcommand == "export" then
             BKA.CastPredictionUI:ShowExport(learner:Export())
         elseif subcommand == "reset" then
-            if detail == "confirm" then
+            if detail == "metrics" or detail == "predictions" then
+                learner:ResetPredictionMetrics()
+                BKA:Print(BKA:L("LEARN_RESET_METRICS_DONE"))
+                if BKA.Options and BKA.Options.Refresh then BKA.Options:Refresh() end
+            elseif detail == "confirm" then
                 learner:Reset(true)
                 BKA:Print(BKA:L("LEARN_RESET_DONE"))
             else

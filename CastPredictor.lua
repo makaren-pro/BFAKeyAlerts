@@ -3,6 +3,9 @@ local Predictor = {}
 BKA.CastPredictor = Predictor
 BKA.CastBaseline = BKA.CastBaseline or {}
 
+Predictor.MODE_NEXT = "NEXT_CAST"
+Predictor.MODE_SCHEDULED = "SCHEDULED_CAST"
+
 local abs, max, min, sqrt = math.abs, math.max, math.min, math.sqrt
 
 local function deviation(stat)
@@ -61,8 +64,12 @@ local function mergeMetrics(a, b)
     return { count = n, hit = (a.hit or 0) + (b.hit or 0), miss = (a.miss or 0) + (b.miss or 0),
         mae = n > 0 and ((a.mae or 0) * an + (b.mae or 0) * bn) / n or 0,
         recentHit = b.recentHit or a.recentHit, recentMiss = b.recentMiss or a.recentMiss,
+        invalidated = (a.invalidated or 0) + (b.invalidated or 0),
         INVALIDATED_BY_CC = (a.INVALIDATED_BY_CC or 0) + (b.INVALIDATED_BY_CC or 0),
-        MOB_DIED = (a.MOB_DIED or 0) + (b.MOB_DIED or 0) }
+        MOB_DIED = (a.MOB_DIED or 0) + (b.MOB_DIED or 0),
+        SUPERSEDED = (a.SUPERSEDED or 0) + (b.SUPERSEDED or 0),
+        EARLY_SUPERSEDED = (a.EARLY_SUPERSEDED or 0) + (b.EARLY_SUPERSEDED or 0),
+        FAILED = (a.FAILED or 0) + (b.FAILED or 0) }
 end
 
 local function mergeSpell(a, b)
@@ -343,6 +350,10 @@ function Predictor:Predict(model, state, now, settings)
     if not model or state.cc.active or state.ccSinceCast then return nil end
     local minimum = max(3, tonumber(settings.minimumSamples) or 5)
     local threshold = tonumber(settings.minimumConfidence) or 0.85
+    local function modeForSource(source)
+        if source == "same-spell" or source == "rotation" then return self.MODE_SCHEDULED end
+        return self.MODE_NEXT
+    end
     local function makePrediction(id, stat, probability, samples, source, anchorTime, anchor, certainty)
         if not id or not stat or not anchorTime then return nil end
         local spell = model.spells[id]
@@ -354,7 +365,8 @@ function Predictor:Predict(model, state, now, settings)
         if expected + late <= now then return nil end
         return { spellID = id, expectedTime = expected, earlyWindow = window,
             lateWindow = late, confidence = score, source = source, samples = samples,
-            stddev = deviation(stat), anchor = anchor or "START", probability = probability or 1 }
+            stddev = deviation(stat), anchor = anchor or "START", probability = probability or 1,
+            mode = modeForSource(source) }
     end
     local last = state.lastCast
     if last and state.previousCast then
@@ -415,7 +427,8 @@ function Predictor:RecordOutcome(model, prediction, outcome, actualTime)
     if not spell then return end
     local metrics = spell.metrics or { count = 0, hit = 0, miss = 0, mae = 0 }
     spell.metrics = metrics
-    if outcome == "INVALIDATED_BY_CC" or outcome == "MOB_DIED" then
+    if outcome ~= "HIT" and outcome ~= "MISS" then
+        metrics.invalidated = (metrics.invalidated or 0) + 1
         metrics[outcome] = (metrics[outcome] or 0) + 1
         return
     end

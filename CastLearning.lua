@@ -11,6 +11,46 @@ local IMPORTANT = {
     PURGE = true, SOOTHE = true,
 }
 
+local function predictionMode(prediction)
+    if not prediction then return nil end
+    if prediction.mode then return prediction.mode end
+    if prediction.source == "same-spell" or prediction.source == "rotation" then
+        return BKA.CastPredictor.MODE_SCHEDULED
+    end
+    return BKA.CastPredictor.MODE_NEXT
+end
+
+local function predictionMetrics(model)
+    if not model then return nil end
+    if type(model.predictionMetrics) ~= "table" then
+        -- Preserve the legacy scheduled counter as the best available starting point.
+        model.predictionMetrics = { created = tonumber(model.highConfidence) or 0, displayed = 0, invalidated = 0 }
+    end
+    return model.predictionMetrics
+end
+
+local function samePredictionOpportunity(a, b)
+    if not a or not b or a.guid ~= b.guid or a.spellID ~= b.spellID or
+        predictionMode(a) ~= predictionMode(b) or a.source ~= b.source then return false end
+    local aExpected, bExpected = tonumber(a.expectedTime), tonumber(b.expectedTime)
+    if not aExpected or not bExpected then return false end
+    -- START/SUCCESS/INTERRUPT may refresh the same opportunity with a slightly
+    -- better anchor. Keep this deliberately narrow so two nearby real casts are
+    -- never collapsed merely because their prediction windows overlap.
+    return math.abs(aExpected - bExpected) <= 0.5
+end
+
+local function refreshPrediction(existing, candidate)
+    local unit, displayed = existing.unit, existing.wasDisplayed
+    local alertShown, alertKey, alertRow = existing.alertShown, existing.alertKey, existing.alertRow
+    for key in pairs(existing) do existing[key] = nil end
+    for key, value in pairs(candidate) do existing[key] = value end
+    existing.unit = unit
+    existing.wasDisplayed = displayed
+    existing.alertShown, existing.alertKey, existing.alertRow = alertShown, alertKey, alertRow
+    return existing
+end
+
 local function isMobGUID(guid)
     return type(guid) == "string" and (string.find(guid, "^Creature%-") or string.find(guid, "^Vehicle%-"))
 end
@@ -25,6 +65,9 @@ end
 
 function Learning:ResetRuntime()
     if BKA.CastPredictionUI then BKA.CastPredictionUI:Clear() end
+    if BKA.Alerts then
+        for _, state in pairs(self.runtime) do BKA.Alerts:HidePrediction(state.prediction) end
+    end
     wipe(self.runtime)
     self.activeCount = 0
     self.lastSweep = 0
@@ -106,12 +149,17 @@ end
 
 function Learning:Invalidate(state, reason)
     if not state.prediction then return end
+    local prediction = state.prediction
+    reason = reason or "CANCELLED"
     state.lastOutcome = reason
-    if reason == "INVALIDATED_BY_CC" or reason == "MOB_DIED" then
-        local model = self:GetModel(state.prediction.dungeonID, state.npcID)
-        BKA.CastPredictor:RecordOutcome(model, state.prediction, reason)
+    if reason ~= "HIT" and reason ~= "MISS" then
+        local model = self:GetModel(prediction.dungeonID, state.npcID)
+        BKA.CastPredictor:RecordOutcome(model, prediction, reason)
+        local metrics = predictionMetrics(model)
+        if metrics then metrics.invalidated = (metrics.invalidated or 0) + 1 end
     end
-    if BKA.CastPredictionUI then BKA.CastPredictionUI:Hide(state.prediction.unit, state.prediction.guid) end
+    if BKA.CastPredictionUI then BKA.CastPredictionUI:Hide(prediction.unit, prediction.guid) end
+    if BKA.Alerts then BKA.Alerts:HidePrediction(prediction) end
     state.prediction = nil
 end
 
@@ -133,7 +181,6 @@ function Learning:ResolveAbility(npcID, spellID)
 end
 
 function Learning:Schedule(state, guid, model, now)
-    self:Invalidate(state, "SUPERSEDED")
     local cfg = settings()
     if not cfg or not cfg.predictions then return end
     local dungeonID = BKA.activeDungeon and BKA.activeDungeon.challengeMapID
@@ -150,22 +197,63 @@ function Learning:Schedule(state, guid, model, now)
     prediction.controlAction = control
     prediction.severity = ability.severity or "MEDIUM"
     prediction.ability = ability
+    prediction.mode = predictionMode(prediction)
+    local current = state.prediction
+    if current then
+        if samePredictionOpportunity(current, prediction) then
+            refreshPrediction(current, prediction)
+            self:EnsureTicker()
+            return current
+        end
+        -- A scheduled cooldown/rotation prediction is about a timestamp, not the
+        -- immediately following cast. Intermediate casts must not replace it.
+        if predictionMode(current) == BKA.CastPredictor.MODE_SCHEDULED then
+            self:EnsureTicker()
+            return current
+        end
+        self:Invalidate(state, "SUPERSEDED")
+    end
     state.prediction = prediction
-    -- Historical field name; counts eligible predictions scheduled, not unique learned spells.
-    local localModel = model or self:GetOrCreateModel(dungeonID, state.npcID)
-    if localModel then localModel.highConfidence = (localModel.highConfidence or 0) + 1 end
+    local localModel = self:GetOrCreateModel(dungeonID, state.npcID) or model
+    if localModel then
+        local metrics = predictionMetrics(localModel)
+        metrics.created = (metrics.created or 0) + 1
+        -- Keep the old field readable for existing exports/tools, but only count
+        -- unique prediction opportunities from this point onward.
+        localModel.highConfidence = (localModel.highConfidence or 0) + 1
+    end
     self:EnsureTicker()
+    return prediction
 end
 
 function Learning:Feedback(state, spellID, now, model)
     local prediction = state.prediction
     if not prediction then return end
-    local hit = prediction.spellID == spellID and
-        now >= prediction.expectedTime - prediction.earlyWindow and
-        now <= prediction.expectedTime + prediction.lateWindow
-    BKA.CastPredictor:RecordOutcome(model, prediction, hit and "HIT" or "MISS", now)
-    state.lastOutcome = hit and "HIT" or "MISS"
+    local mode = predictionMode(prediction)
+    local early = prediction.expectedTime - prediction.earlyWindow
+    local late = prediction.expectedTime + prediction.lateWindow
+    if mode == BKA.CastPredictor.MODE_SCHEDULED then
+        if prediction.spellID ~= spellID then return end
+        if now < early then
+            -- The same spell fired before the predicted window. The old schedule
+            -- is no longer a useful anchor, but this is not a false-prediction MISS.
+            self:Invalidate(state, "EARLY_SUPERSEDED")
+            return
+        end
+        if now > late then
+            BKA.CastPredictor:RecordOutcome(model, prediction, "MISS", now)
+            state.lastOutcome = "MISS"
+        else
+            BKA.CastPredictor:RecordOutcome(model, prediction, "HIT", now)
+            state.lastOutcome = "HIT"
+        end
+    else
+        local hit = prediction.spellID == spellID and now >= early and now <= late
+        BKA.CastPredictor:RecordOutcome(model, prediction, hit and "HIT" or "MISS", now)
+        state.lastOutcome = hit and "HIT" or "MISS"
+    end
     if BKA.CastPredictionUI then BKA.CastPredictionUI:Hide(prediction.unit, prediction.guid) end
+    if BKA.Alerts then BKA.Alerts:HidePrediction(prediction) end
     state.prediction = nil
 end
 
@@ -359,10 +447,33 @@ function Learning:UpdatePredictions(now)
                 if unit and string.match(unit, "^nameplate") and UnitGUID(unit) == guid and
                     now >= prediction.expectedTime - (tonumber(cfg.leadTime) or 1) then
                     prediction.unit = unit
-                    BKA.CastPredictionUI:Show(unit, prediction, prediction.ability)
+                    local shown = BKA.CastPredictionUI:Show(unit, prediction, prediction.ability)
+                    if shown and not prediction.wasDisplayed then
+                        prediction.wasDisplayed = true
+                        local model = self:GetModel(prediction.dungeonID, state.npcID)
+                        local metrics = predictionMetrics(model)
+                        if metrics then metrics.displayed = (metrics.displayed or 0) + 1 end
+                    end
+                    if shown and BKA.Alerts then
+                        if cfg.showPredictionAlerts ~= false and BKA.db.showAlerts ~= false then
+                            if prediction.alertShown and not BKA.Alerts:SyncPrediction(prediction) then
+                                prediction.alertShown = nil
+                            end
+                            if not prediction.alertShown then
+                                prediction.alertShown = BKA.Alerts:ShowPrediction(prediction)
+                            end
+                        else
+                            BKA.Alerts:HidePrediction(prediction)
+                        end
+                    elseif BKA.Alerts then
+                        BKA.Alerts:HidePrediction(prediction)
+                    end
                 elseif prediction.unit then
                     BKA.CastPredictionUI:Hide(prediction.unit, prediction.guid)
                     prediction.unit = nil
+                    if BKA.Alerts then BKA.Alerts:HidePrediction(prediction) end
+                elseif BKA.Alerts then
+                    BKA.Alerts:HidePrediction(prediction)
                 end
             end
         end
@@ -394,19 +505,29 @@ end
 function Learning:OnNameplateRemoved(unit)
     local guid = UnitGUID(unit)
     local state = guid and self.runtime[guid]
-    if state and state.prediction then state.prediction.unit = nil end
+    if state and state.prediction then
+        state.prediction.unit = nil
+        if BKA.Alerts then BKA.Alerts:HidePrediction(state.prediction) end
+    end
 end
 
 function Learning:GetSummary()
     local out = { dungeonID = BKA.activeDungeon and BKA.activeDungeon.challengeMapID,
         observations = 0, npcs = 0, spells = 0, entries = 0, highConfidence = 0,
-        hits = 0, misses = 0, accuracy = 0 }
+        created = 0, displayed = 0, invalidated = 0, hits = 0, misses = 0, accuracy = 0 }
     local db = settings()
     for _, dungeon in pairs(db and db.dungeons or {}) do
         for _, model in pairs(dungeon.npcs or {}) do
             out.npcs = out.npcs + 1
             out.observations = out.observations + (model.total or 0)
-            out.highConfidence = out.highConfidence + (model.highConfidence or 0)
+            local aggregate = model.predictionMetrics
+            if type(aggregate) == "table" then
+                out.created = out.created + (aggregate.created or 0)
+                out.displayed = out.displayed + (aggregate.displayed or 0)
+                out.invalidated = out.invalidated + (aggregate.invalidated or 0)
+            else
+                out.created = out.created + (model.highConfidence or 0)
+            end
             for _, spell in pairs(model.spells or {}) do
                 out.spells = out.spells + 1
                 out.entries = out.entries + 1
@@ -424,6 +545,7 @@ function Learning:GetSummary()
     end
     local count = out.hits + out.misses
     if count > 0 then out.accuracy = out.hits / count end
+    out.highConfidence = out.created
     return out
 end
 
@@ -486,5 +608,22 @@ function Learning:Reset(confirm)
     if not db then return false end
     db.dungeons = {}
     self:ResetRuntime()
+    return true
+end
+
+function Learning:ResetPredictionMetrics()
+    local db = settings()
+    if not db then return false end
+    for _, dungeon in pairs(db.dungeons or {}) do
+        for _, model in pairs(dungeon.npcs or {}) do
+            model.highConfidence = 0
+            model.predictionMetrics = { created = 0, displayed = 0, invalidated = 0 }
+            for _, spell in pairs(model.spells or {}) do
+                if type(spell.metrics) == "table" then
+                    spell.metrics = { count = 0, hit = 0, miss = 0, mae = 0 }
+                end
+            end
+        end
+    end
     return true
 end
