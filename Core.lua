@@ -4,7 +4,7 @@ local BKA = addon or {}
 _G.BFAKeyAlerts = BKA
 
 BKA.name = addonName
-BKA.version = "1.6.0"
+BKA.version = "1.6.1"
 BKA.dungeons = {}
 BKA.dungeonByChallengeMap = {}
 BKA.dungeonByInstanceMap = {}
