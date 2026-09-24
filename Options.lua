@@ -8,6 +8,13 @@ local SUPPORT_URL = "https://www.donationalerts.com/r/makarenr"
 local SECTIONS = {"general", "mechanics", "nameplates", "prediction", "kicks", "keystone", "sounds"}
 
 function Options:ShowSupportLink()
+    if self.frame then self.frame:Hide() end
+    if BKA.CastPredictionUI then
+        if BKA.CastPredictionUI.inspector then BKA.CastPredictionUI.inspector:Hide() end
+        if BKA.CastPredictionUI.exportFrame then BKA.CastPredictionUI.exportFrame:Hide() end
+    end
+    if BKA.MinimapButton and BKA.MinimapButton.dialog then BKA.MinimapButton.dialog:Hide() end
+    if GameTooltip then GameTooltip:Hide() end
     if not self.supportDialog then
         local frame = CreateFrame("Frame", "BFAKeyAlertsSupportDialog", UIParent)
         frame:SetSize(500, 145); frame:SetPoint("CENTER"); frame:SetFrameStrata("DIALOG")
