@@ -346,8 +346,12 @@ local function confidence(stat, samples, probability, minimum, metrics, anchorCe
     return min(1, count * probability * stability * accuracy * (anchorCertainty or 1) * ccFactor)
 end
 
-function Predictor:Predict(model, state, now, settings)
-    if not model or state.cc.active or state.ccSinceCast then return nil end
+local function collectPredictions(self, model, state, now, settings, out, firstOnly)
+    if not firstOnly then
+        out = out or {}
+        for i = #out, 1, -1 do out[i] = nil end
+    end
+    if not model or state.cc.active or state.ccSinceCast then return out end
     local minimum = max(3, tonumber(settings.minimumSamples) or 5)
     local threshold = tonumber(settings.minimumConfidence) or 0.85
     local function modeForSource(source)
@@ -368,20 +372,32 @@ function Predictor:Predict(model, state, now, settings)
             stddev = deviation(stat), anchor = anchor or "START", probability = probability or 1,
             mode = modeForSource(source) }
     end
+    local append
+    if not firstOnly then
+        append = function(prediction, priority)
+            if prediction then
+                prediction._priority = priority
+                out[#out + 1] = prediction
+            end
+        end
+    end
     local last = state.lastCast
     if last and state.previousCast then
         local key = tostring(state.previousCast.spellID) .. ":" .. tostring(last.spellID)
         local id, stat, probability, samples = winningEdge(model.second[key], minimum)
-        local result = makePrediction(id, stat, probability, samples, "second-order", last.start)
-        if result then return result end
+        local prediction = makePrediction(id, stat, probability, samples, "second-order", last.start)
+        if firstOnly and prediction then return prediction end
+        if not firstOnly then append(prediction, 1) end
     end
     if last then
         local id, stat, probability, samples = winningEdge(model.transitions[last.spellID], minimum)
-        local result = makePrediction(id, stat, probability, samples, "transition", last.start)
-        if result then return result end
+        local prediction = makePrediction(id, stat, probability, samples, "transition", last.start)
+        if firstOnly and prediction then return prediction end
+        if not firstOnly then append(prediction, 2) end
     end
     if last then
-        local best, ambiguous
+        local best, ambiguous, sameSpell = nil, false, nil
+        if not firstOnly then sameSpell = {} end
         for spellID, spell in pairs(model.spells) do
             local previous = state.lastBySpell[spellID]
             if previous then
@@ -393,6 +409,7 @@ function Predictor:Predict(model, state, now, settings)
                 local result = candidate and makePrediction(spellID, candidate, 1, rotationSamples or candidate.n,
                     rotationStat and "rotation" or "same-spell", base, chosen, certainty)
                 if result then
+                    if not firstOnly then sameSpell[#sameSpell + 1] = result end
                     if not best or result.expectedTime < best.expectedTime then
                         if best and math.abs(result.expectedTime - best.expectedTime) <=
                             math.max(result.earlyWindow, best.earlyWindow) + 0.3 then ambiguous = true end
@@ -404,7 +421,12 @@ function Predictor:Predict(model, state, now, settings)
                 end
             end
         end
-        if best and not ambiguous then return best end
+        if firstOnly then
+            if best and not ambiguous then return best end
+        else
+            for _, result in ipairs(sameSpell) do append(result, 3) end
+            if best and ambiguous then best._ambiguous = true end
+        end
     end
     if not last and state.combatStartReliable then
         local total, best, runner = 0, nil, 0
@@ -417,9 +439,20 @@ function Predictor:Predict(model, state, now, settings)
             elseif n > runner then runner = n end
         end
         if best and total >= minimum and best.n / total >= 0.82 and (best.n - runner) / total >= 0.25 then
-            return makePrediction(best.id, best.stat, best.n / total, best.n, "opening", state.combatStart)
+            local prediction = makePrediction(best.id, best.stat, best.n / total, best.n, "opening", state.combatStart)
+            if firstOnly and prediction then return prediction end
+            if not firstOnly then append(prediction, 4) end
         end
     end
+    return out
+end
+
+function Predictor:CollectPredictions(model, state, now, settings, out)
+    return collectPredictions(self, model, state, now, settings, out, false)
+end
+
+function Predictor:Predict(model, state, now, settings)
+    return collectPredictions(self, model, state, now, settings, nil, true)
 end
 
 function Predictor:RecordOutcome(model, prediction, outcome, actualTime)

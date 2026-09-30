@@ -38,6 +38,11 @@ BKA.defaults = {
         width = 370,
     },
     firestorm = {},
+    enemySpellCooldowns = { enabled = true, minSeverity = 3, maxAbilities = 2, predictedOnly = true, debug = false },
+    autoMarkers = { enabled = true, onlyInKey = true, priority = 1, preserveManual = true },
+    partyFrameTargets = { enabled = true, maxSpells = 3, minSeverity = 3, iconSize = 18, anchor = 1, countdown = true },
+    mobState = { enabled = true, absorb = true, power = true, immunity = true, fixate = true, thresholds = true, purge = true },
+    castbarIntelligence = { enabled = true, interruptTick = true, properties = true },
     castLearning = {
         version = 1, enabled = true, predictions = true, showPredictionAlerts = true, importantOnly = false,
         leadTime = 3.0, minimumSamples = 5, minimumConfidence = 0.85,
@@ -64,7 +69,7 @@ function BKA:InitDB()
     for key, value in pairs(self.defaults.soundActions) do
         if self.db.soundActions[key] == nil then self.db.soundActions[key] = value end
     end
-    local nested = { "layout", "kickTracker", "keystoneHUD", "minimap" }
+    local nested = { "layout", "kickTracker", "keystoneHUD", "minimap", "enemySpellCooldowns", "autoMarkers", "partyFrameTargets", "mobState", "castbarIntelligence" }
     for _, tableKey in ipairs(nested) do
         if type(self.db[tableKey]) ~= "table" then self.db[tableKey] = {} end
         for key, value in pairs(self.defaults[tableKey]) do
@@ -138,6 +143,11 @@ SlashCmdList.BFAKEYALERTS = function(input)
         end
     elseif command == "config" then
         BKA.Options:Open()
+    elseif command == "intelligence" and argument == "status" then
+        local hosts = 0
+        for _ in pairs(BKA.CombatIntelligence and BKA.CombatIntelligence.hosts or {}) do hosts = hosts + 1 end
+        local state = BKA.AutoMarkers and BKA.AutoMarkers:GetCoordinationState() or {}
+        BKA:Print(BKA:L("CI_STATUS_FMT", hosts, tostring(state.owner or "-"), BKA:L(state.ready and "ON" or "OFF")))
     elseif command == "learn" then
         local subcommand, detail = string.match(argument, "^(%S*)%s*(.-)%s*$")
         local learner = BKA.CastLearning

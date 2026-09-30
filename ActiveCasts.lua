@@ -2,6 +2,11 @@ local BKA = BFAKeyAlerts
 local ActiveCasts = { byUnit = {}, bySourceSpell = {}, recentlyOwned = {}, generation = 0 }
 BKA.ActiveCasts = ActiveCasts
 
+local function refreshPartyTargets()
+    if BKA.PartyFrameTargets then BKA.PartyFrameTargets:CastsChanged() end
+    if BKA.CastbarIntelligence then BKA.CastbarIntelligence:CastsChanged() end
+end
+
 local function readCast(unit, forceChannel)
     local name, _, texture, startMS, endMS, _, apiCastID, notInterruptible, spellID
     local isChannel = forceChannel and true or false
@@ -27,6 +32,7 @@ local function readCast(unit, forceChannel)
         startTime = startMS / 1000,
         endTime = endMS / 1000,
         notInterruptible = notInterruptible and true or false,
+        interruptibilityKnown = type(notInterruptible) == "boolean",
         isChannel = isChannel,
     }
 end
@@ -214,6 +220,7 @@ function ActiveCasts:ApplyConfirmedTarget(cast, target, evidence)
             })
         end
     end
+    refreshPartyTargets()
     return true
 end
 
@@ -287,6 +294,7 @@ function ActiveCasts:ReleaseCast(cast)
     if cast.alertKey then
         BKA.Alerts:Hide(cast.alertKey, cast.generation)
     end
+    refreshPartyTargets()
     return true
 end
 
@@ -425,6 +433,7 @@ function ActiveCasts:Start(unit, eventCastGUID, eventSpellID, forceChannel)
     if resolution.shouldLog then
         BKA.Logger:RecordUnknownCast(cast)
     end
+    refreshPartyTargets()
     return cast
 end
 
@@ -444,6 +453,7 @@ function ActiveCasts:Resync(unit, eventCastGUID, eventSpellID, forceChannel)
     old.endTime = fresh.endTime
     old.texture = fresh.texture or old.texture
     old.notInterruptible = fresh.notInterruptible
+    old.interruptibilityKnown = fresh.interruptibilityKnown
     old.isChannel = fresh.isChannel
     if eventCastGUID and old.hasEventCastGUID then
         old.castGUID = eventCastGUID
@@ -483,6 +493,7 @@ function ActiveCasts:Resync(unit, eventCastGUID, eventSpellID, forceChannel)
     if old.alertKey then
         BKA.Alerts:Resync(old.alertKey, old.generation, old.startTime, old.endTime, old.texture)
     end
+    refreshPartyTargets()
     return old
 end
 
@@ -567,6 +578,7 @@ function ActiveCasts:UnitGone(unit)
         self:RememberOwnership(cast)
         self:Unindex(cast)
     end
+    refreshPartyTargets()
 end
 
 function ActiveCasts:StopSource(sourceGUID)
@@ -588,4 +600,5 @@ function ActiveCasts:Clear()
     wipe(self.byUnit)
     wipe(self.bySourceSpell)
     wipe(self.recentlyOwned)
+    refreshPartyTargets()
 end

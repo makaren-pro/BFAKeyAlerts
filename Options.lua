@@ -5,7 +5,7 @@ BKA.Options = Options
 local WHITE = "Interface\\Buttons\\WHITE8X8"
 local ACCENT = {0.40, 0.88, 0.74}
 local SUPPORT_URL = "https://www.donationalerts.com/r/makarenr"
-local SECTIONS = {"general", "mechanics", "nameplates", "prediction", "kicks", "keystone", "sounds"}
+local SECTIONS = {"general", "mechanics", "nameplates", "prediction", "intelligence", "kicks", "keystone", "sounds"}
 
 function Options:ShowSupportLink()
     if self.frame then self.frame:Hide() end
@@ -130,7 +130,10 @@ local function refreshCombat(clear)
 end
 
 local function onChanged(path)
-    if string.match(path, "^castLearning%.") then
+    if string.match(path, "^enemySpellCooldowns%.") or string.match(path, "^autoMarkers%.") or
+        string.match(path, "^partyFrameTargets%.") or string.match(path, "^mobState%.") or string.match(path, "^castbarIntelligence%.") then
+        if BKA.CombatIntelligence then BKA.CombatIntelligence:SettingsChanged(path) end
+    elseif string.match(path, "^castLearning%.") then
         if BKA.CastLearning and BKA.CastLearning.SettingsChanged then BKA.CastLearning:SettingsChanged() end
         if BKA.CastPredictionUI then
             BKA.CastPredictionUI:Refresh()
@@ -279,6 +282,37 @@ local function buildNameplates()
     toggle(p, "clickableNameplateAlerts", "OPT_CLICKABLE", nil, 116, true)
 end
 
+local function buildIntelligence()
+    local p = page("intelligence")
+    toggle(p, "enemySpellCooldowns.enabled", "CI_COOLDOWNS", "CI_COOLDOWNS_DESC")
+    slider(p, "enemySpellCooldowns.minSeverity", "CI_SEVERITY", 1, 4, 1, "%d")
+    slider(p, "enemySpellCooldowns.maxAbilities", "CI_MAX_ABILITIES", 1, 3, 1, "%d")
+    toggle(p, "enemySpellCooldowns.predictedOnly", "CI_PREDICTED_ONLY", "CI_PREDICTED_ONLY_DESC")
+    toggle(p, "enemySpellCooldowns.debug", "CI_CONFIDENCE")
+    toggle(p, "autoMarkers.enabled", "CI_MARKERS", "CI_MARKERS_DESC")
+    toggle(p, "autoMarkers.onlyInKey", "CI_ONLY_KEY")
+    slider(p, "autoMarkers.priority", "CI_MARK_PRIORITY", 1, 2, 1, "%d")
+    label(p.child, 10, 24, p.y, 550, BKA:L("CI_MARK_PRIORITY_DESC")); p.y = p.y - 36
+    toggle(p, "autoMarkers.preserveManual", "CI_PRESERVE_MANUAL", "CI_PRESERVE_MANUAL_DESC")
+    toggle(p, "partyFrameTargets.enabled", "CI_PARTY", "CI_PARTY_DESC")
+    slider(p, "partyFrameTargets.maxSpells", "CI_MAX_SPELLS", 1, 3, 1, "%d")
+    slider(p, "partyFrameTargets.minSeverity", "CI_SEVERITY", 1, 4, 1, "%d")
+    slider(p, "partyFrameTargets.iconSize", "CI_ICON_SIZE", 12, 28, 1, "%d px")
+    slider(p, "partyFrameTargets.anchor", "CI_ANCHOR", 1, 3, 1, "%d")
+    label(p.child, 10, 24, p.y, 550, BKA:L("CI_ANCHOR_DESC")); p.y = p.y - 36
+    toggle(p, "partyFrameTargets.countdown", "CI_COUNTDOWN")
+    toggle(p, "mobState.enabled", "CI_MOB_STATE")
+    toggle(p, "mobState.absorb", "CI_ABSORB")
+    toggle(p, "mobState.power", "CI_POWER")
+    toggle(p, "mobState.immunity", "CI_IMMUNITY")
+    toggle(p, "mobState.fixate", "CI_FIXATE")
+    toggle(p, "mobState.thresholds", "CI_THRESHOLDS")
+    toggle(p, "mobState.purge", "CI_PURGE")
+    toggle(p, "castbarIntelligence.enabled", "CI_CASTBAR")
+    toggle(p, "castbarIntelligence.interruptTick", "CI_INTERRUPT_TICK")
+    toggle(p, "castbarIntelligence.properties", "CI_PROPERTIES")
+end
+
 local function buildPrediction()
     local p = page("prediction")
     heading(p, "CP_SETTINGS")
@@ -423,7 +457,7 @@ function Options:Initialize()
         self.nav[section] = nav
     end
     self.frame = frame
-    buildGeneral(); buildMechanics(); buildNameplates(); buildPrediction(); buildKicks(); buildKeystone(); buildSounds()
+    buildGeneral(); buildMechanics(); buildNameplates(); buildPrediction(); buildIntelligence(); buildKicks(); buildKeystone(); buildSounds()
     for _, item in pairs(self.pages) do
         item.child:SetHeight(math.max(465, -item.y + 16))
     end

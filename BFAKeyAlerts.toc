@@ -29,6 +29,16 @@ Nameplates.lua
 CastPredictor.lua
 CastLearning.lua
 CastPredictionUI.lua
+CombatIntelligence.lua
+EnemySpellCooldowns.lua
+AutoMarkers.lua
+PartyFrameTargets.lua
+PartyFrameAdapters/Blizzard.lua
+PartyFrameAdapters/VuhDo.lua
+PartyFrameAdapters/HealBot.lua
+MobStatePolicies.lua
+MobState.lua
+CastbarIntelligence.lua
 Affixes.lua
 SpecialHandlers.lua
 

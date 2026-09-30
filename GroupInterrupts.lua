@@ -130,6 +130,39 @@ local function cooldownText(remaining)
     return tostring(math.ceil(remaining))
 end
 
+local function finiteNumber(value)
+    value = tonumber(value)
+    if not value or value ~= value or value == math.huge or value == -math.huge then return nil end
+    return value
+end
+
+local function actualCooldownReadyAt(spellID, now)
+    if type(GetSpellCooldown) ~= "function" then return nil end
+    local ok, start, duration, enabled = pcall(GetSpellCooldown, spellID)
+    start, duration = ok and finiteNumber(start) or nil, ok and finiteNumber(duration) or nil
+    if not start or not duration or start < 0 or duration < 0 or enabled ~= 1 then return nil end
+
+    local mirror = false
+    local gcdOK, gcdStart, gcdDuration = pcall(GetSpellCooldown, 61304)
+    gcdStart, gcdDuration = gcdOK and finiteNumber(gcdStart) or nil, gcdOK and finiteNumber(gcdDuration) or nil
+    if gcdOK and gcdStart and gcdDuration and gcdStart >= 0 and gcdDuration >= 0 then
+        mirror = duration <= gcdDuration + 0.15 and math.abs(start + duration - gcdStart - gcdDuration) <= 0.15
+    end
+    return mirror and now or math.max(now, start + duration), duration
+end
+
+local function knownSpell(spellID, isPet)
+    if type(IsSpellKnown) == "function" then
+        local ok, known = pcall(IsSpellKnown, spellID, isPet and true or nil)
+        if ok and known then return true end
+    end
+    if not isPet and type(IsPlayerSpell) == "function" then
+        local ok, known = pcall(IsPlayerSpell, spellID)
+        if ok and known then return true end
+    end
+    return false
+end
+
 function Tracker:GetPrimarySpell(unit)
     local _, class = UnitClass(unit)
     if not class then return nil end
@@ -143,6 +176,33 @@ function Tracker:GetPrimarySpell(unit)
     if class == "DRUID" and spec == 102 then id = 78675 end
     if class == "HUNTER" and spec == 255 then id = 187707 end
     return id
+end
+
+function Tracker:GetPlayerInterruptReadyAt(now)
+    now = finiteNumber(now) or (GetTime and GetTime()) or 0
+    if type(UnitExists) ~= "function" or
+        type(UnitIsDeadOrGhost) ~= "function" or type(UnitIsConnected) ~= "function" then return nil end
+    local playerExistsOK, playerExists = pcall(UnitExists, "player")
+    if not playerExistsOK or not playerExists then return nil end
+    local deadOK, dead = pcall(UnitIsDeadOrGhost, "player")
+    local connectedOK, connected = pcall(UnitIsConnected, "player")
+    if not deadOK or dead or not connectedOK or not connected then return nil end
+
+    if type(self.GetPrimarySpell) ~= "function" then return nil end
+    local primaryOK, spellID = pcall(self.GetPrimarySpell, self, "player")
+    if not primaryOK then return nil end
+    if not spellID or not knownSpell(spellID, spellID == 19647) then return nil end
+    if spellID == 19647 then
+        if type(UnitExists) ~= "function" or
+            type(UnitIsDeadOrGhost) ~= "function" or type(UnitIsConnected) ~= "function" then return nil end
+        local petExistsOK, petExists = pcall(UnitExists, "pet")
+        if not petExistsOK or not petExists then return nil end
+        local petDeadOK, petDead = pcall(UnitIsDeadOrGhost, "pet")
+        local petConnectedOK, petConnected = pcall(UnitIsConnected, "pet")
+        if not petDeadOK or petDead or not petConnectedOK or not petConnected then return nil end
+    end
+    local readyAt = actualCooldownReadyAt(spellID, now)
+    return readyAt
 end
 
 function Tracker:GetAbilityDefinitions(unit)
@@ -263,12 +323,10 @@ function Tracker:GetAbilityState(unit, definition)
     end
 
     local name, icon = spellName(definition.spellID), spellIcon(definition.spellID)
-    if unit == "player" and GetSpellCooldown then
-        local start, duration, enabled = GetSpellCooldown(definition.spellID)
-        if start and duration and enabled == 1 then
-            local gs, gd = GetSpellCooldown(61304)
-            local mirror = gs and gd and duration <= gd + 0.15 and math.abs(start + duration - gs - gd) <= 0.15
-            remaining = mirror and 0 or math.max(0, start + duration - now)
+    if unit == "player" then
+        local readyAt, duration = actualCooldownReadyAt(definition.spellID, now)
+        if readyAt then
+            remaining = math.max(0, readyAt - now)
             if duration > 1.5 then definition.cooldown = duration end
             state = remaining > 0 and "cooldown" or "ready"
         end

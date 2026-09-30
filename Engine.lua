@@ -8,6 +8,8 @@ local HOT_EVENTS = {
     "UNIT_SPELLCAST_CHANNEL_START",
     "UNIT_SPELLCAST_DELAYED",
     "UNIT_SPELLCAST_CHANNEL_UPDATE",
+    "UNIT_SPELLCAST_INTERRUPTIBLE",
+    "UNIT_SPELLCAST_NOT_INTERRUPTIBLE",
     "UNIT_SPELLCAST_STOP",
     "UNIT_SPELLCAST_CHANNEL_STOP",
     "UNIT_SPELLCAST_INTERRUPTED",
@@ -376,6 +378,7 @@ end
 function BKA:Activate(dungeon)
     if self.active and self.activeDungeon == dungeon then
         self.Affixes:Refresh()
+        if self.CombatIntelligence then self.CombatIntelligence:RefreshEnabled() end
         return
     end
     self:Deactivate()
@@ -388,6 +391,8 @@ function BKA:Activate(dungeon)
     self.Targets:RefreshBossUnits()
     self:RegisterHotEvents(dungeon)
     self.Affixes:Refresh()
+    if self.CombatIntelligence then self.CombatIntelligence:RefreshEnabled() end
+    if self.AutoMarkers then self.AutoMarkers:SettingsChanged() end
 end
 
 function BKA:Deactivate()
@@ -395,6 +400,8 @@ function BKA:Deactivate()
         return
     end
     self.active = false
+    if self.AutoMarkers then self.AutoMarkers:SettingsChanged() end
+    if self.CombatIntelligence then self.CombatIntelligence:Clear() end
     self.CastLearning:ResetRuntime()
     self:UnregisterHotEvents()
     self.Alerts:Clear()
@@ -651,6 +658,9 @@ function BKA:HandleCombatLog()
     local timestamp, event, _, sourceGUID, sourceName, sourceFlags, _, destGUID, destName, destFlags, _, arg12, arg13, arg14, arg15, arg16, arg17, arg18, arg19, arg20, arg21, arg22 = CombatLogGetCurrentEventInfo()
     self.CastLearning:OnCombatLog(event, sourceGUID, sourceFlags, destGUID, destFlags,
         type(arg12) == "number" and arg12 or nil, event == "SPELL_INTERRUPT" and arg15 or nil)
+    if self.MobState and self.MobState.OnCombatLog then
+        self.MobState:OnCombatLog(event, sourceGUID, destGUID, type(arg12) == "number" and arg12 or nil)
+    end
     if event == "UNIT_DIED" then
         self.Timers:CancelSource(destGUID)
         self.ActiveCasts:StopSource(destGUID)
@@ -763,12 +773,15 @@ function BKA:OnEvent(event, ...)
             if self.Nameplates and self.Nameplates.RefreshClickTargeting then
                 self.Nameplates:RefreshClickTargeting()
             end
+            if self.CombatIntelligence then self.CombatIntelligence:Initialize() end
+            if self.AutoMarkers then self.AutoMarkers:Initialize() end
             self:RefreshActivation()
         end
         return
     elseif event == "PLAYER_ENTERING_WORLD" then
         self:ResetCompletionSound()
         self.CastLearning:ResetRuntime()
+        if self.CombatIntelligence then self.CombatIntelligence:Clear() end
         if self.db then
             C_Timer.After(0.5, function()
                 if BKA.Nameplates and BKA.Nameplates.RefreshClickTargeting then
@@ -818,7 +831,7 @@ function BKA:OnEvent(event, ...)
             self.ActiveCasts:Start(unit, castGUID, spellID, event == "UNIT_SPELLCAST_CHANNEL_START")
         end
         self.SpecialHandlers:HandleUnitEvent(event, unit, spellID)
-    elseif event == "UNIT_SPELLCAST_DELAYED" or event == "UNIT_SPELLCAST_CHANNEL_UPDATE" then
+    elseif event == "UNIT_SPELLCAST_DELAYED" or event == "UNIT_SPELLCAST_CHANNEL_UPDATE" or event == "UNIT_SPELLCAST_INTERRUPTIBLE" or event == "UNIT_SPELLCAST_NOT_INTERRUPTIBLE" then
         local unit, castGUID, spellID = ...
         if string.match(unit or "", "^nameplate%d+$") or string.match(unit or "", "^boss%d$") then
             self.ActiveCasts:Resync(unit, castGUID, spellID, event == "UNIT_SPELLCAST_CHANNEL_UPDATE")

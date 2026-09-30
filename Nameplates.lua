@@ -866,6 +866,7 @@ function Nameplates:OnAdded(unit)
 end
 
 function Nameplates:OnRemoved(unit)
+    if BKA.CombatIntelligence then BKA.CombatIntelligence:RemoveUnit(unit) end
     if BKA.CastPredictionUI then BKA.CastPredictionUI:OnRemoved(unit) end
     if BKA.CastLearning and BKA.CastLearning.OnNameplateRemoved then BKA.CastLearning:OnNameplateRemoved(unit) end
     BKA.ActiveCasts:UnitGone(unit)
@@ -931,6 +932,7 @@ function Nameplates:RefreshAll()
 end
 
 function Nameplates:Clear()
+    if BKA.CombatIntelligence then BKA.CombatIntelligence:ClearNameplates() end
     for unit, overlay in pairs(self.overlays) do
         overlay.generation = (overlay.generation or 0) + 1
         overlay:SetScript("OnUpdate", nil)

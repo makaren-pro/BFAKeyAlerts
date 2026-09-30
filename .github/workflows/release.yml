@@ -20,7 +20,7 @@ jobs:
           version="${GITHUB_REF_NAME#v}"
           mkdir -p "dist/BFAKeyAlerts"
           cp BFAKeyAlerts.toc ./*.lua "dist/BFAKeyAlerts/"
-          cp -R Data Media Sounds "dist/BFAKeyAlerts/"
+          cp -R Data Media Sounds PartyFrameAdapters "dist/BFAKeyAlerts/"
           (cd dist && zip -r "BFAKeyAlerts-${version}.zip" BFAKeyAlerts)
       - name: Publish GitHub release
         env:
