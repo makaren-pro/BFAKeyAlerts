@@ -33,8 +33,10 @@ local function readRun()
         affixes = {}, bosses = {}, bossCount = 0, bossDone = 0,
     }
     for _, id in ipairs(affixes or {}) do
-        local title, _, icon = C_ChallengeMode.GetAffixInfo(id)
-        run.affixes[#run.affixes + 1] = (icon and ("|T" .. icon .. ":14:14:0:0|t ") or "") .. (title or tostring(id))
+        if id ~= 11 then
+            local title, _, icon = C_ChallengeMode.GetAffixInfo(id)
+            run.affixes[#run.affixes + 1] = (icon and ("|T" .. icon .. ":14:14:0:0|t ") or "") .. (title or tostring(id))
+        end
     end
 
     local count = select(3, C_Scenario.GetStepInfo()) or 0

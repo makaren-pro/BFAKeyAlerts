@@ -4,7 +4,6 @@ BKA.Affixes = Affixes
 
 local AURA_ABILITIES = {
     [209858] = { id = 209858, affix = 4, mechanic = "TANK", action = "KITE", severity = "HIGH", center = true, sound = true, stack = 20, role = "TANK", tankOnly = true }, -- Necrotic
-    [240443] = { id = 240443, affix = 11, mechanic = "AOE", action = "BURSTING", severity = "HIGH", center = true, sound = true, stack = 3 },
     [240447] = { id = 240447, affix = 14, mechanic = "SPREAD", action = "SPREAD", severity = "CRITICAL", center = true, sound = true }, -- Quaking
     [226512] = { id = 226512, affix = 8, mechanic = "GTFO", action = "GTFO", severity = "CRITICAL", center = true, sound = true }, -- Sanguine
     [209862] = { id = 209862, affix = 3, mechanic = "MOVE", action = "MOVE", severity = "HIGH", center = true, sound = true }, -- Volcanic
@@ -44,7 +43,7 @@ function Affixes:Refresh()
     local _, affixIDs = C_ChallengeMode.GetActiveKeystoneInfo()
     if type(affixIDs) == "table" then
         for _, affixID in ipairs(affixIDs) do
-            self.active[affixID] = true
+            if affixID ~= 11 then self.active[affixID] = true end
         end
     end
     -- Existing nameplates are already on screen when the countdown starts. Refresh
@@ -172,6 +171,9 @@ function Affixes:ScanUnitAuras(unit)
 end
 
 function Affixes:HandleCombatLog(event, spellID, spellName, destGUID, destName, amount)
+    -- Bursting is intentionally unsupported. Mark the old aura spell as handled so
+    -- Engine does not classify it as an unknown hostile cast and log it.
+    if spellID == 240443 then return true end
     if spellID == 209858 and event == "SPELL_PERIODIC_DAMAGE" then return true end
     local ability
     if self:IsCursedPulse(spellID, spellName) then

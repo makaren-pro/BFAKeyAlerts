@@ -18,12 +18,30 @@ BKA.defaults = {
     showInfestedAdds = true,
     showFrontalTarget = true,
     clickableNameplateAlerts = true,
+    emphasizeInterruptibleCasts = false,
+    hideUninterruptibleDuringKick = false,
+    hideChatBubblesInKey = true,
     autoInsertKeystone = true,
     showEnemyForcesTooltip = true,
     minimap = { angle = 225, hide = false },
     kickTracker = {
         shown = true, locked = true, scale = 1, width = 320, alpha = 0.92, onlyInKey = false,
         point = "CENTER", relativePoint = "CENTER", x = 350, y = -160,
+    },
+    healerHUD = {
+        shown = false, locked = true, scale = 1, alpha = 1, backgroundAlpha = 0.75,
+        iconSize = 32, columns = 6, onlyInKey = false,
+        point = "CENTER", relativePoint = "CENTER", x = 0, y = 170,
+    },
+    tankHUD = {
+        shown = false, locked = true, scale = 1, alpha = 1, backgroundAlpha = 0.75,
+        iconSize = 32, columns = 6, onlyInKey = false,
+        point = "CENTER", relativePoint = "CENTER", x = 0, y = 330,
+    },
+    defensiveHUD = {
+        shown = true, locked = false, scale = 1, alpha = 1, backgroundAlpha = 0.75,
+        iconSize = 32, columns = 6, onlyInKey = false,
+        point = "CENTER", relativePoint = "CENTER", x = 350, y = 170,
     },
     keystoneHUD = {
         shown = true, locked = true, scale = 1, backgroundAlpha = 0.75, hideBlizzard = true,
@@ -42,7 +60,7 @@ BKA.defaults = {
     autoMarkers = { enabled = true, onlyInKey = true, priority = 1, preserveManual = true },
     partyFrameTargets = { enabled = true, maxSpells = 3, minSeverity = 3, iconSize = 18, anchor = 1, countdown = true },
     mobState = { enabled = true, absorb = true, power = true, immunity = true, fixate = true, thresholds = true, purge = true },
-    castbarIntelligence = { enabled = true, interruptTick = true, properties = true },
+    castbarIntelligence = { enabled = true, interruptTick = true },
     castLearning = {
         version = 1, enabled = true, predictions = true, showPredictionAlerts = true, importantOnly = false,
         leadTime = 3.0, minimumSamples = 5, minimumConfidence = 0.85,
@@ -69,7 +87,7 @@ function BKA:InitDB()
     for key, value in pairs(self.defaults.soundActions) do
         if self.db.soundActions[key] == nil then self.db.soundActions[key] = value end
     end
-    local nested = { "layout", "kickTracker", "keystoneHUD", "minimap", "enemySpellCooldowns", "autoMarkers", "partyFrameTargets", "mobState", "castbarIntelligence" }
+    local nested = { "layout", "kickTracker", "healerHUD", "tankHUD", "defensiveHUD", "keystoneHUD", "minimap", "enemySpellCooldowns", "autoMarkers", "partyFrameTargets", "mobState", "castbarIntelligence" }
     for _, tableKey in ipairs(nested) do
         if type(self.db[tableKey]) ~= "table" then self.db[tableKey] = {} end
         for key, value in pairs(self.defaults[tableKey]) do
@@ -102,13 +120,17 @@ SlashCmdList.BFAKEYALERTS = function(input)
     if command == "on" then
         setBoolean("enabled", true, BKA:L("ADDON"))
         BKA:RefreshActivation()
+        if BKA.ChatBubbles then BKA.ChatBubbles:Refresh() end
         if BKA.Nameplates and BKA.Nameplates.RefreshClickTargeting then BKA.Nameplates:RefreshClickTargeting() end
+        if BKA.GroupCooldowns then BKA.GroupCooldowns:Refresh(true) end
         if BKA.GroupInterrupts then BKA.GroupInterrupts:Refresh(true) end
         if BKA.KeystoneHUD then BKA.KeystoneHUD:Refresh(true) end
     elseif command == "off" then
         setBoolean("enabled", false, BKA:L("ADDON"))
         BKA:RefreshActivation()
+        if BKA.ChatBubbles then BKA.ChatBubbles:Refresh() end
         if BKA.Nameplates and BKA.Nameplates.RefreshClickTargeting then BKA.Nameplates:RefreshClickTargeting() end
+        if BKA.GroupCooldowns then BKA.GroupCooldowns:Refresh(true) end
         if BKA.GroupInterrupts then BKA.GroupInterrupts:Refresh(true) end
         if BKA.KeystoneHUD then BKA.KeystoneHUD:Refresh(true) end
     elseif command == "alerts" and (argument == "on" or argument == "off") then
@@ -141,6 +163,8 @@ SlashCmdList.BFAKEYALERTS = function(input)
         if BKA.Nameplates and BKA.Nameplates.PrintClickTargetingStatus then
             BKA.Nameplates:PrintClickTargetingStatus()
         end
+    elseif command == "bubbles" and argument == "status" then
+        if BKA.ChatBubbles then BKA.ChatBubbles:PrintStatus() end
     elseif command == "config" then
         BKA.Options:Open()
     elseif command == "intelligence" and argument == "status" then

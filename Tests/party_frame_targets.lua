@@ -42,6 +42,7 @@ local function makeFrame(name, unit, parent)
     function frame:SetAllPoints() end
     function frame:Show() self.shown = true end
     function frame:Hide() self.shown = false end
+    function frame:SetShown(value) self.shown = value end
     function frame:IsShown() return self.shown end
     function frame:IsVisible() return self.shown end
     function frame:IsForbidden() return self.forbidden == true end
@@ -60,6 +61,7 @@ CreateFrame = function(_, name, parent)
     return frame
 end
 GetTime = function() return now end
+GetSpellTexture = function(spellID) return "spell-icon-" .. tostring(spellID) end
 UnitGUID = function(unit) return currentUnits[unit] end
 UnitExists = function(unit) return currentUnits[unit] ~= nil end
 UnitIsUnit = function(left, right) return currentUnits[left] ~= nil and currentUnits[left] == currentUnits[right] end
@@ -237,4 +239,125 @@ assert(targets.bindings["Player-C"], "target change immediately attaches the new
 active:ReleaseCast(changing)
 equal(targets.bindings["Player-C"], nil, "cast stop hook clears immediately")
 
+-- Preview uses only current real group units and can run outside an active dungeon,
+-- independently of the party-target feature toggle.
+BFAKeyAlerts.active = false
+BFAKeyAlerts.db.partyFrameTargets.enabled = false
+BFAKeyAlerts.db.partyFrameTargets.maxSpells = 2
+BFAKeyAlerts.db.partyFrameTargets.anchor = 3
+local castsBeforePreview = 0
+for _ in pairs(active.byUnit) do castsBeforePreview = castsBeforePreview + 1 end
+equal(targets:SetPreview(true), true, "preview enables outside an active dungeon")
+equal(targets:IsPreviewEnabled(), true, "preview state is observable")
+for guid in pairs(targets.candidates) do
+    assert(guid == "Player-A" or guid == "Player-B" or guid == "Player-C", "preview uses only the current roster")
+end
+equal(targets.candidates["Player-A"].unit, "player", "solo player frame is previewed")
+equal(targets.candidates["Player-B"].unit, "party1", "party member is previewed")
+equal(targets.candidates["Player-C"].unit, "party2", "second party member is previewed")
+binding = targets.bindings["Player-B"]
+assert(binding and binding.overlay, "preview attaches through the existing Blizzard adapter")
+equal(binding.overlay.rows[1].icon.texture, "spell-icon-62618", "preview shows the first sample spell")
+equal(binding.overlay.rows[2].icon.texture, "spell-icon-97462", "configured icon limit applies to preview")
+equal(binding.overlay.rows[3].shown, false, "preview respects maxSpells")
+equal(binding.overlay.width, 18, "side anchor uses configured icon size")
+equal(binding.overlay.height, 38, "side anchor lays icons vertically")
+equal(binding.overlay.points[1][1], "LEFT", "configured side anchor applies during preview")
+equal(binding.overlay.rows[1].count.value, "3.0", "preview countdown uses the repeating sample duration")
+equal(targets.frame.OnUpdate ~= nil, true, "preview installs its own update loop")
+if not BFAKeyAlerts.CombatIntelligence then dofile("CombatIntelligence.lua") end
+local CI = BFAKeyAlerts.CombatIntelligence
+CI.frame = makeFrame("CombatIntelligence", nil)
+CI:SettingsChanged("partyFrameTargets.iconSize")
+equal(targets:IsPreviewEnabled(), true, "settings changes preserve preview outside an active dungeon")
+equal(targets.bindings["Player-B"].overlay.width, 18, "settings refresh keeps preview layout current")
+BFAKeyAlerts.db.partyFrameTargets.anchor = 2
+targets:SettingsChanged()
+equal(targets.bindings["Player-B"].overlay.points[1][1], "BOTTOM", "anchor changes reattach the preview overlay")
+BFAKeyAlerts.db.partyFrameTargets.anchor = 3
+targets:SettingsChanged()
+BFAKeyAlerts.db.partyFrameTargets.countdown = false
+targets:SettingsChanged()
+equal(targets.bindings["Player-B"].overlay.rows[1].count.shown, false, "preview obeys countdown toggle")
+BFAKeyAlerts.db.partyFrameTargets.countdown = true
+targets:SettingsChanged()
+equal(targets.bindings["Player-B"].overlay.rows[1].count.shown, true, "countdown can be restored in preview")
+
+-- Roster rebinding follows current GUIDs and never manufactures test members.
+currentUnits.party1 = "Player-D"
+CompactPartyFrameMember2 = makeFrame("CompactPartyFrameMember2", "party1")
+targets:SettingsChanged()
+equal(targets.bindings["Player-B"], nil, "preview detaches from a recycled roster token")
+assert(targets.bindings["Player-D"], "preview attaches to the current roster member")
+equal(targets.candidates["Player-D"].unit, "party1", "preview candidate follows current roster token")
+for guid in pairs(targets.candidates) do
+    assert(guid ~= "BKA_PREVIEW" and (guid == "Player-A" or guid == "Player-C" or guid == "Player-D"),
+        "preview contains only real roster GUIDs")
+end
+currentUnits.party1 = "Player-B"
+targets:SettingsChanged()
+now = 21.5
+targets.frame.OnUpdate(targets.frame, 0.1)
+equal(targets.bindings["Player-B"].overlay.rows[1].count.value, "2.5", "preview countdown updates")
+local castsAfterPreview = 0
+for _ in pairs(active.byUnit) do castsAfterPreview = castsAfterPreview + 1 end
+equal(castsAfterPreview, castsBeforePreview, "preview never inserts synthetic events into ActiveCasts")
+
+-- Turning preview off clears its samples, stops its timer, and immediately restores real casts.
+BFAKeyAlerts.active = true
+BFAKeyAlerts.db.partyFrameTargets.enabled = true
+BFAKeyAlerts.db.partyFrameTargets.maxSpells = 3
+BFAKeyAlerts.db.partyFrameTargets.anchor = 1
+local real = cast("Creature-8", 70, "restored-real", "CRITICAL", now + 10, "Player-B")
+currentUnits.nameplate8 = "Creature-8"
+active.byUnit.nameplate8 = real
+targets:SettingsChanged()
+for _, entry in ipairs(targets.candidates["Player-B"].casts) do
+    assert(entry.preview, "preview mode shows its isolated sample instead of real casts")
+end
+equal(targets:SetPreview(false), false, "preview disables")
+equal(targets:IsPreviewEnabled(), false, "preview state resets")
+equal(targets.frame.OnUpdate, nil, "preview update loop stops")
+binding = targets.bindings["Player-B"]
+assert(binding and binding.overlay.rows[1].icon.texture == "texture-restored-real",
+    "real dungeon cast is restored immediately")
+for _, entry in ipairs(targets.candidates["Player-B"].casts) do
+    assert(not entry.preview, "preview candidates are removed when the mode ends")
+end
+
+-- Lifecycle clearing also stops preview and removes every bound overlay.
+targets:SetPreview(true)
+BFAKeyAlerts.db.enabled = false
+CI:RefreshEnabled()
+equal(targets:IsPreviewEnabled(), false, "Clear ends preview for lifecycle cleanup")
+equal(targets.frame.OnUpdate, nil, "Clear stops preview timer")
+equal(next(targets.bindings), nil, "Clear detaches preview overlays")
+BFAKeyAlerts.db.enabled = true
+
+-- The player also has a raid token; preview each GUID exactly once.
+BFAKeyAlerts.active = false
+currentUnits.raid1 = "Player-A"
+currentUnits.raid2 = "Player-B"
+IsInRaid = function() return true end
+GetNumGroupMembers = function() return 2 end
+targets:SetPreview(true)
+equal(#targets.candidates["Player-A"].casts, 3, "player/raid aliases do not duplicate preview samples")
+equal(targets.candidates["Player-A"].unit, "player", "own frame stays bound to player token")
+local searches = 0
+for _, adapter in ipairs(targets.adapters) do
+    local original = adapter.FindFrameForUnit
+    adapter.FindFrameForUnit = function(self, ...)
+        searches = searches + 1
+        return original(self, ...)
+    end
+end
+local beforeCountdown = targets.bindings["Player-A"].overlay.rows[1].count.value
+for i = 1, 5 do
+    now = now + 0.15
+    targets.frame.OnUpdate(targets.frame, 0.15)
+end
+equal(searches, 0, "stable preview ticks reuse existing frame bindings")
+assert(targets.bindings["Player-A"].overlay.rows[1].count.value ~= beforeCountdown,
+    "countdowns continue without frame rediscovery")
+targets:SetPreview(false)
 print("party_frame_targets: PASS")

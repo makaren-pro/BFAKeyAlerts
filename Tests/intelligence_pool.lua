@@ -6,8 +6,12 @@ local function frame(parent)
     function f:SetParent(p) self.parent = p end
     function f:GetParent() return self.parent end
     function f:EnableMouse(v) self.mouse = v end
-    function f:SetSize() end
-    function f:SetPoint() end
+    function f:SetSize(w, h) self.width, self.height = w, h end
+    function f:GetHeight() return self.height or 0 end
+    function f:GetWidth() return self.width or 1 end
+    function f:SetFrameStrata(v) self.strata = v end
+    function f:IsShown() return self.shown end
+    function f:SetPoint(...) self.point = { ... } end
     function f:ClearAllPoints() end
     function f:Show() self.shown = true end
     function f:Hide() self.shown = false end
@@ -44,6 +48,30 @@ dofile("CombatIntelligence.lua")
 local ci = bka.CombatIntelligence
 local host = ci:GetHost("nameplate1")
 assert(host:GetParent() == plate and host:GetParent() ~= overlay and host.shown, "satellite independent of hidden primary")
+assert(host.point[2] == plate, "hidden mechanic uses the nameplate anchor")
+overlay.ownerGUID = guid
+overlay:Show()
+ci:LayoutHost(host)
+assert(host.point[2] == overlay, "visible large cast owns the secondary panel anchor")
+overlay.circle = frame(overlay)
+overlay.circle:Show()
+ci:LayoutHost(host)
+assert(host.point[2] == overlay.circle, "circular mechanic keeps badges outside its bounds")
+overlay.circle:Hide()
+overlay.square = frame(overlay)
+overlay.square:Show()
+ci:LayoutHost(host)
+assert(host.point[2] == overlay.square, "frontal mechanic keeps badges outside its bounds")
+host.stateFrame = frame(host)
+host.stateFrame:SetSize(270, 40)
+host.stateFrame:Show()
+host.groups.enemySpellCooldowns = { frame(host), frame(host) }
+ci:LayoutHost(host)
+assert(host.groups.enemySpellCooldowns[1].point[5] == 44, "timers sit above state rows")
+assert(host.groups.enemySpellCooldowns[2].point[4] == 78, "timers use a compact horizontal row")
+host.stateFrame:Hide()
+ci:LayoutHost(host)
+assert(host.groups.enemySpellCooldowns[1].point[5] == 4, "empty state panel leaves no reserved height")
 local rows = ci:GetRows(host, "test", 2, 18)
 rows[1]:Show(); rows[2]:Show()
 assert(rows[1].mouse == false and host.mouse == false)

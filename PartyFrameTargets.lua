@@ -1,7 +1,7 @@
 local BKA = BFAKeyAlerts
 local Targets = {
     adapters = {}, adapterByName = {}, bindings = {}, candidates = {}, freeOverlays = {}, dirty = true,
-    initialized = false, elapsed = 0, lastUpdate = 0,
+    initialized = false, elapsed = 0, lastUpdate = 0, previewEnabled = false,
     nextDiscoveryAt = 0,
 }
 BKA.PartyFrameTargets = Targets
@@ -13,6 +13,16 @@ end
 local function enabled()
     return BKA.active == true and BKA.db and BKA.db.enabled ~= false and config().enabled == true
 end
+
+local function addonEnabled()
+    return BKA.db and BKA.db.enabled ~= false
+end
+
+local PREVIEW_CASTS = {
+    { spellID = 62618, severity = "CRITICAL", duration = 4, icon = "Interface\\Icons\\Spell_Holy_PowerWordBarrier" },
+    { spellID = 97462, severity = "HIGH", duration = 7, icon = "Interface\\Icons\\Ability_Warrior_RallyingCry" },
+    { spellID = 1022, severity = "MEDIUM", duration = 10, icon = "Interface\\Icons\\Spell_Holy_BlessingOfProtection" },
+}
 
 local function safeCall(object, method, ...)
     if not object then return nil, false end
@@ -163,12 +173,15 @@ end
 
 function Targets:_collect(now)
     wipe(self.candidates)
-    if not enabled() or not BKA.ActiveCasts then return end
+    local showLiveCasts = not self.previewEnabled and enabled() and BKA.ActiveCasts
+    local showPreview = self.previewEnabled and addonEnabled()
+    if not showLiveCasts and not showPreview then return end
     local unitByGUID, seen, liveSources = {}, {}, {}
-    for unit, cast in pairs(BKA.ActiveCasts.byUnit or {}) do
-        if unit and UnitExists(unit) and UnitGUID(unit) == cast.sourceGUID then liveSources[cast] = true end
-    end
-    for _, cast in pairs(BKA.ActiveCasts.byUnit or {}) do
+    if showLiveCasts then
+      for unit, cast in pairs(BKA.ActiveCasts.byUnit or {}) do
+          if unit and UnitExists(unit) and UnitGUID(unit) == cast.sourceGUID then liveSources[cast] = true end
+      end
+      for _, cast in pairs(BKA.ActiveCasts.byUnit or {}) do
         local targetGUID = cast.targetGUID
         local ability = cast.resolution and cast.resolution.ability
         local severity = severityRank(cast)
@@ -193,6 +206,43 @@ function Targets:_collect(now)
                     texture = texture, cast = cast,
                     severityName = (cast.resolution and cast.resolution.severity) or ability.severity,
                 }
+            end
+        end
+      end
+    end
+    if showPreview then
+        local units = { "player" }
+        if IsInRaid and IsInRaid() then
+            local count = GetNumGroupMembers and GetNumGroupMembers() or 40
+            for i = 1, math.min(count, 40) do units[#units + 1] = "raid" .. i end
+        else
+            for i = 1, 4 do units[#units + 1] = "party" .. i end
+        end
+        for _, unit in ipairs(units) do
+            if UnitExists and UnitExists(unit) then
+                local guid = UnitGUID and UnitGUID(unit)
+                if guid and not self.candidates[guid] then
+                    local group = self.candidates[guid]
+                    if not group then group = { unit = unit, casts = {} }; self.candidates[guid] = group end
+                    unitByGUID[guid] = unit
+                    for index, sample in ipairs(PREVIEW_CASTS) do
+                        local remaining = sample.duration - (now % sample.duration)
+                        if remaining < 0.1 then remaining = sample.duration end
+                        local texture
+                        if GetSpellTexture then texture = GetSpellTexture(sample.spellID) end
+                        if not texture and GetSpellInfo then texture = select(3, GetSpellInfo(sample.spellID)) end
+                        texture = texture or sample.icon
+                        local fakeCast = { spellID = sample.spellID, sourceGUID = "BKA_PREVIEW", texture = texture }
+                        group.casts[#group.casts + 1] = {
+                            id = "BKA_PREVIEW:" .. tostring(guid) .. ":" .. index,
+                            sourceGUID = "BKA_PREVIEW", spellID = sample.spellID,
+                            startTime = now - (sample.duration - remaining), endTime = now + remaining,
+                            severity = BKA.severityRank and BKA.severityRank[sample.severity] or 0,
+                            texture = texture, cast = fakeCast, severityName = sample.severity,
+                            preview = true,
+                        }
+                    end
+                end
             end
         end
     end
@@ -264,6 +314,42 @@ function Targets:Refresh()
     if self.initialized then self:Update(GetTime and GetTime() or 0, true) end
 end
 
+function Targets:IsPreviewEnabled()
+    return self.previewEnabled == true
+end
+
+function Targets:SetPreview(value)
+    value = value == true and addonEnabled() or false
+    if self.previewEnabled == value then
+        if value then self:Refresh() end
+        return self.previewEnabled
+    end
+    self.previewEnabled = value
+    self.elapsed = 0
+    if self.frame then
+        self.frame:SetScript("OnUpdate", value and function(_, elapsed)
+            self.elapsed = self.elapsed + (tonumber(elapsed) or 0)
+            if self.elapsed < 0.1 then return end
+            self.elapsed = 0
+            self:Update(GetTime and GetTime() or 0, false)
+        end or nil)
+    end
+    self:ClearBindings()
+    self.dirty = true
+    if value then
+        for _, adapter in ipairs(self.adapters) do if adapter.Refresh then adapter:Refresh() end end
+        if self.initialized then self:Update(GetTime and GetTime() or 0, true) end
+    else
+        self:Refresh()
+    end
+    return self.previewEnabled
+end
+
+function Targets:SettingsChanged()
+    self:ClearBindings()
+    self:Refresh()
+end
+
 function Targets:CastsChanged()
     self.dirty = true
     if self.initialized then self:Update(GetTime and GetTime() or 0, true) end
@@ -271,6 +357,10 @@ end
 
 function Targets:Update(now, force)
     if not self.initialized then return end
+    if self.previewEnabled and not addonEnabled() then
+        self:SetPreview(false)
+        return
+    end
     now = tonumber(now) or (GetTime and GetTime()) or 0
     if not force and now - self.lastUpdate < 0.1 then return end
     self.lastUpdate = now
@@ -341,13 +431,18 @@ function Targets:Update(now, force)
     end
 end
 
-function Targets:Clear()
+function Targets:ClearBindings()
     for guid, binding in pairs(self.bindings) do
         binding.adapter:DetachOverlay(guid, binding.overlay)
         self.bindings[guid] = nil
     end
     wipe(self.candidates)
     self.dirty = true
+end
+
+function Targets:Clear()
+    self:SetPreview(false)
+    self:ClearBindings()
 end
 
 function Targets:Initialize()
@@ -360,6 +455,8 @@ function Targets:Initialize()
     frame:RegisterEvent("PLAYER_ENTERING_WORLD")
     frame:RegisterEvent("PLAYER_REGEN_ENABLED")
     frame:SetScript("OnEvent", function(_, event, addonName)
+        if not addonEnabled() then self:Clear(); return end
+        if event == "PLAYER_ENTERING_WORLD" then self:Clear(); return end
         self.dirty = true
         for _, adapter in ipairs(self.adapters) do if adapter.Refresh then adapter:Refresh(event, addonName) end end
         self:Update(GetTime and GetTime() or 0, true)

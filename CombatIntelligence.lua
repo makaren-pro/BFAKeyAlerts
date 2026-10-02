@@ -2,6 +2,33 @@ local BKA = BFAKeyAlerts
 local CI = { hosts = {}, elapsed = 0 }
 BKA.CombatIntelligence = CI
 
+-- Keep secondary information above the visible mechanic, including its shapes.
+function CI:LayoutHost(host)
+    local overlay = host.overlay
+    local anchor = host:GetParent()
+    if overlay and overlay.ownerGUID == host.ownerGUID and overlay:IsShown() then
+        anchor = overlay
+        if overlay.circle and overlay.circle:IsShown() then anchor = overlay.circle
+        elseif overlay.square and overlay.square:IsShown() then anchor = overlay.square end
+        if overlay.controlBadge and overlay.controlBadge:IsShown() then anchor = overlay.controlBadge end
+    end
+    if overlay and overlay.infestedMarker and overlay.infestedMarker:IsShown() then anchor = overlay.infestedMarker end
+    host:ClearAllPoints()
+    host:SetPoint("BOTTOM", anchor, "TOP", 0, 14)
+    local state = host.stateFrame
+    local height = state and state:IsShown() and state:GetHeight() or 0
+    local width = state and state:IsShown() and state:GetWidth() or 1
+    local timers = 0
+    for _, row in ipairs(host.groups.enemySpellCooldowns or {}) do
+        if row:IsShown() then timers = timers + 1 end
+    end
+    host:SetSize(math.max(width, timers * 78, 1), 1)
+    for index, row in ipairs(host.groups.enemySpellCooldowns or {}) do
+        row:ClearAllPoints()
+        row:SetPoint("BOTTOMLEFT", host, "BOTTOMLEFT", (index - 1) * 78, height + 4)
+    end
+end
+
 -- Satellite frames belong to the existing nameplate pool, but remain visible
 -- when the primary mechanic overlay has no winning state.
 function CI:GetHost(unit)
@@ -16,6 +43,7 @@ function CI:GetHost(unit)
         host = CreateFrame("Frame", nil, plate)
         host:EnableMouse(false)
         host:SetSize(1, 1)
+        host:SetFrameStrata("HIGH")
         host.groups = {}
         overlay.intelligenceHost = host
     end
@@ -30,6 +58,8 @@ function CI:GetHost(unit)
         host:SetPoint("BOTTOM", plate, "TOP", 0, 3)
     end
     host.unit = unit
+    host.overlay = overlay
+    self:LayoutHost(host)
     host:Show()
     self.hosts[unit] = host
     return host
@@ -99,7 +129,11 @@ function CI:RefreshEnabled()
          (db.mobState and db.mobState.enabled) or
          (db.castbarIntelligence and db.castbarIntelligence.enabled))
     self.frame:SetShown(enabled and true or false)
-    if not enabled then self:Clear() end
+    if not enabled then
+        self:ClearNameplates()
+        local targets = BKA.PartyFrameTargets
+        if targets and (not db or db.enabled == false or not targets:IsPreviewEnabled()) then targets:Clear() end
+    end
 end
 
 function CI:SettingsChanged(path)
@@ -145,6 +179,7 @@ function CI:Initialize()
         if BKA.PartyFrameTargets then BKA.PartyFrameTargets:Update(now) end
         if BKA.MobState then BKA.MobState:Update(now) end
         if BKA.CastbarIntelligence then BKA.CastbarIntelligence:Update(now) end
+        for _, host in pairs(CI.hosts) do CI:LayoutHost(host) end
     end)
     frame:Hide()
 end

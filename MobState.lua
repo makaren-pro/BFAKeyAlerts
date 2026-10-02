@@ -51,6 +51,12 @@ local function label(key)
     return BKA.L and BKA:L(key) or key
 end
 
+local function shortValue(value)
+    if value >= 1000000 then return string.format("%.1fm", value / 1000000) end
+    if value >= 10000 then return string.format("%.0fk", value / 1000) end
+    return tostring(math.floor(value + 0.5))
+end
+
 local function shortName(unit)
     if not UnitName then return "?" end
     local ok, name = pcall(UnitName, unit)
@@ -222,10 +228,8 @@ local function stateFrameFor(host, guid, unit)
         frame.ownerGUID = guid
     end
     frame:ClearAllPoints()
-    local healthBar = getNativeHealthBar(unit)
-    local plate = host.GetParent and host:GetParent()
-    frame:SetPoint("TOPLEFT", healthBar or plate or host, "TOPRIGHT", 3, 0)
-    frame:SetSize(90, 1)
+    frame:SetPoint("BOTTOMLEFT", host, "BOTTOMLEFT", 0, 0)
+    frame:SetSize(270, 1)
     frame:Show()
     return frame
 end
@@ -292,17 +296,17 @@ local function render(entry)
     local auraCount = math.min(MAX_AURAS, #entry.auras)
     local status = {}
     if option("absorb") and entry.absorbs and entry.absorbs > 0 then
-        status[#status + 1] = { key = "absorb", text = label("CI_SHIELD_BADGE") .. " " .. tostring(math.floor(entry.absorbs + 0.5)), icon = FALLBACK_ABSORB_ICON }
+        status[#status + 1] = { key = "absorb", text = label("CI_SHIELD_BADGE") .. " " .. shortValue(entry.absorbs), icon = FALLBACK_ABSORB_ICON }
     end
     if option("power") and entry.power then
-        status[#status + 1] = { key = "power", text = entry.power.label .. " " .. tostring(math.floor(entry.power.current + 0.5)) .. "/" .. tostring(math.floor(entry.power.maximum + 0.5)), icon = FALLBACK_POWER_ICON }
+        status[#status + 1] = { key = "power", text = shortValue(entry.power.current) .. "/" .. shortValue(entry.power.maximum), icon = FALLBACK_POWER_ICON }
     end
     local fixate = entry.fixate
     local fixateUnit = fixate and unitForGUID(fixate.targetGUID)
     if option("fixate") and fixate and fixateUnit then
         local color = fixate.targetColor
         local targetName = fixate.targetName
-        if color then targetName = string.format("|cff%02x%02x%02x%s|r", color[1] * 255, color[2] * 255, color[3] * 255, targetName) end
+        if color then targetName = string.format("|cff%02x%02x%02x%s|r", math.floor(color[1] * 255), math.floor(color[2] * 255), math.floor(color[3] * 255), targetName) end
         status[#status + 1] = { key = "fixate", text = label("CI_FIXATE_BADGE") .. " " .. targetName, icon = fixate.icon or FALLBACK_FIXATE_ICON }
     end
     local rowCount = math.min(6, auraCount + #status)
@@ -314,12 +318,14 @@ local function render(entry)
     end
     if rowCount == 0 then
         intelligence:HideRows(host, GROUP_KEY)
-        stateFrame:SetHeight(1)
+        if stateFrame.powerBar then stateFrame.powerBar:Hide() end
+        stateFrame:SetSize(1, 1)
         stateFrame:Show()
         return
     end
     local rows = intelligence:GetRows(host, GROUP_KEY, rowCount, 16)
-    stateFrame:SetHeight(rowCount * 18)
+    local lineCount = (auraCount > 0 and 1 or 0) + (#status > 0 and 1 or 0)
+    stateFrame:SetSize(math.max(auraCount, #status) * 90, lineCount * 20 + (entry.power and option("power") and 4 or 0))
     for index = 1, rowCount do
         local row, aura = rows[index], entry.auras[index]
         local texture, text, stateKey
@@ -332,7 +338,12 @@ local function render(entry)
         end
         row:ClearAllPoints()
         row:SetParent(stateFrame)
-        row:SetPoint("TOPLEFT", stateFrame, "TOPLEFT", 0, -(index - 1) * 18)
+        local column = index <= auraCount and index - 1 or index - auraCount - 1
+        local line = index <= auraCount and 0 or (auraCount > 0 and 1 or 0)
+        row:SetSize(90, 16)
+        row:SetPoint("TOPLEFT", stateFrame, "TOPLEFT", column * 90, -line * 20)
+        if row.text.SetWidth then row.text:SetWidth(68) end
+        if row.text.SetWordWrap then row.text:SetWordWrap(false) end
         row.icon:SetTexture(texture)
         row.text:SetText(text)
         if stateKey == "power" and entry.power then
@@ -341,14 +352,13 @@ local function render(entry)
                 bar = CreateFrame("StatusBar", nil, stateFrame)
                 bar:EnableMouse(false)
                 bar:SetSize(64, 4)
-                bar:SetPoint("TOPLEFT", stateFrame, "TOPLEFT", 0, -rowCount * 18)
                 if bar.SetStatusBarTexture then bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar") end
                 stateFrame.powerBar = bar
             end
             bar:SetMinMaxValues(0, entry.power.maximum)
             bar:SetValue(entry.power.current)
             bar:ClearAllPoints()
-            bar:SetPoint("TOPLEFT", stateFrame, "TOPLEFT", 0, -rowCount * 18)
+            bar:SetPoint("TOPLEFT", row, "BOTTOMLEFT", 19, -1)
             if bar.SetStatusBarColor then bar:SetStatusBarColor(0.25, 0.7, 1, 0.9) end
             bar:Show()
         end

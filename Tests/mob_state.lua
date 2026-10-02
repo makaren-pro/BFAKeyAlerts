@@ -184,7 +184,11 @@ state:Update(now)
 
 local dazar = state.entries[units.nameplate1]
 assert(dazar and dazar.host and dazar.host.stateFrame.shown, "Dazar state host is active")
-equal(dazar.host.stateFrame.points[1][2], plates.nameplate1.parent.UnitFrame.healthBar, "mob badges anchor outside the native health bar")
+equal(dazar.host.stateFrame.points[1][2], dazar.host, "mob badges anchor above the shared intelligence host")
+equal(dazar.host.stateFrame.points[1][1], "BOTTOMLEFT", "state panel grows upward from the host")
+equal(dazar.host.stateFrame.height, 40, "three auras and absorbs fit into two compact lines")
+equal(dazar.host.groups.mobState[3].points[1][4], 180, "third aura stays in the horizontal aura line")
+equal(dazar.host.groups.mobState[4].points[1][5], -20, "absorbs occupy the separate status line")
 equal(#dazar.auras, 3, "supported auras dedupe by spell ID and cap at three")
 equal(dazar.auras[1].spellID, 267981, "damage reduction aura sorts first")
 assert(string.find(dazar.auras[2].text, "×I", 1, true) and string.find(dazar.auras[2].text, "SH", 1, true),
@@ -207,7 +211,14 @@ equal(adderis.power.current, 7, "Adderis reads actual default power")
 equal(adderis.power.maximum, 13, "Adderis uses real maximum, not 100")
 equal(galvazzt.power.current, 56, "Galvazzt reads alternate power type 10")
 equal(galvazzt.power.maximum, 100, "Galvazzt uses UnitPowerMax type 10")
-equal(powerCalls[1].type, nil, "Adderis uses default UnitPower type")
+local hasDefaultPower = false
+for _, call in ipairs(powerCalls) do
+    if call.unit == "nameplate2" then
+        equal(call.type, nil, "Adderis uses default UnitPower type")
+        hasDefaultPower = true
+    end
+end
+assert(hasDefaultPower, "Adderis power API is read")
 local hasAlternatePower = false
 for _, call in ipairs(powerCalls) do if call.unit == "nameplate3" and call.type == 10 then hasAlternatePower = true end end
 assert(hasAlternatePower, "Galvazzt requests actual alternate type")

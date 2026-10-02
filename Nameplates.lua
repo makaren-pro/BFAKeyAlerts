@@ -8,6 +8,8 @@ local OVERLAY_HEIGHT = 31
 local OVERLAY_GAP = 3
 local CLICK_PADDING = 4
 local HOVER_SCALE = 1.08
+local KICK_SCALE = 1.30
+local UNINTERRUPTIBLE_SCALE = 0.80
 local HOVER_CHECK_INTERVAL = 0.03
 local CIRCLE_SIZE = 104
 local CIRCLE_PULSE_SIZE = 126
@@ -49,8 +51,9 @@ end
 function Nameplates:GetDesiredClickInsets()
     local defaults = self.clickDefaults or {}
     local nativeWidth = defaults.width or OVERLAY_WIDTH
-    local horizontalExtension = math.max(0, (OVERLAY_WIDTH - nativeWidth) * 0.5) + CLICK_PADDING
-    local topExtension = math.max(OVERLAY_HEIGHT, CIRCLE_SIZE + 10, SQUARE_SIZE + 10) + OVERLAY_GAP + CLICK_PADDING
+    local scale = BKA.db and BKA.db.emphasizeInterruptibleCasts and KICK_SCALE * HOVER_SCALE or 1
+    local horizontalExtension = math.max(0, (OVERLAY_WIDTH * scale - nativeWidth) * 0.5) + CLICK_PADDING
+    local topExtension = math.max(OVERLAY_HEIGHT, CIRCLE_SIZE + 10, SQUARE_SIZE + 10) * scale + OVERLAY_GAP + CLICK_PADDING
 
     -- Negative insets expand the preferred native nameplate click region.
     -- Preserve a larger click region if another nameplate addon already configured one.
@@ -62,6 +65,11 @@ function Nameplates:GetDesiredClickInsets()
 end
 
 function Nameplates:RefreshClickTargeting()
+    if InCombatLockdown and InCombatLockdown() then
+        self.clickTargetingPending = true
+        return self.clickTargetingApplied
+    end
+    self.clickTargetingPending = nil
     local enabled = not self.forceRestore and BKA.db and BKA.db.enabled ~= false and BKA.db.showNameplates ~= false and BKA.db.clickableNameplateAlerts ~= false
     if enabled then
         if not self:CaptureClickTargetingDefaults() then return false end
@@ -113,9 +121,14 @@ end
 
 local logout = CreateFrame("Frame")
 logout:RegisterEvent("PLAYER_LOGOUT")
-logout:SetScript("OnEvent", function()
-    Nameplates.forceRestore = true
-    Nameplates:RefreshClickTargeting()
+logout:RegisterEvent("PLAYER_REGEN_ENABLED")
+logout:SetScript("OnEvent", function(_, event)
+    if event == "PLAYER_LOGOUT" then
+        Nameplates.forceRestore = true
+        Nameplates:RefreshClickTargeting()
+    elseif Nameplates.clickTargetingPending then
+        Nameplates:RefreshClickTargeting()
+    end
 end)
 
 local function priority(action, severity, persistent)
@@ -444,12 +457,46 @@ local function setShapeMode(overlay, shape, state, color)
     setControlBadge(overlay, state.controlAction, shape, color)
 end
 
+function Nameplates:GetCastScale(state)
+    if not BKA.db or not BKA.db.emphasizeInterruptibleCasts or not state or not state.castIdentity then return 1 end
+    if not state.interruptibilityKnown then return 1 end
+    return state.notInterruptible and UNINTERRUPTIBLE_SCALE or KICK_SCALE
+end
+
+-- Keep suppressed overlays shown with zero alpha so their cast-expiry OnUpdate
+-- continues running. The native nameplate and its secure click region are untouched.
+function Nameplates:RefreshCastVisibility()
+    if not (BKA.db and BKA.db.hideUninterruptibleDuringKick) and not self.castFocusActive then return end
+    local hasKick = false
+    if BKA.db and BKA.db.enabled ~= false and BKA.db.showNameplates ~= false and BKA.db.hideUninterruptibleDuringKick then
+        local now = GetTime()
+        for unit, overlay in pairs(self.overlays) do
+            local state = overlay.activeState
+            if state and state.castIdentity and state.interruptibilityKnown and not state.notInterruptible
+                and overlay.ownerGUID == UnitGUID(unit) and overlay:IsVisible()
+                and (not state.endTime or state.endTime > now) then
+                hasKick = true
+                break
+            end
+        end
+    end
+    self.castFocusActive = hasKick
+    for _, overlay in pairs(self.overlays) do
+        local state = overlay.activeState or overlay.temporaryState or overlay.predictionState or overlay.persistentState
+        local suppress = hasKick and state and state == overlay.activeState
+            and state.interruptibilityKnown and state.notInterruptible and true or false
+        overlay.castSuppressed = suppress
+        overlay:SetAlpha(suppress and 0 or (state and state.prediction and 0.30 or 1))
+    end
+end
+
 local function resetHoverVisual(overlay)
+    local scale = overlay.baseScale or 1
     overlay.hovered = false
     overlay.hoverElapsed = 0
-    overlay.currentScale = 1
-    overlay.targetScale = 1
-    overlay:SetScale(1)
+    overlay.currentScale = scale
+    overlay.targetScale = scale
+    overlay:SetScale(scale)
     if overlay.baseColor then
         local color = overlay.baseColor
         overlay.background:SetColorTexture(color[1] * 0.13, color[2] * 0.13, color[3] * 0.13, 0.94)
@@ -464,9 +511,10 @@ function Nameplates:UpdateHoverVisual(overlay, elapsed)
     end
     overlay.hoverElapsed = 0
 
-    local hoverEnabled = self.clickTargetingApplied == true and BKA.db and BKA.db.enabled ~= false and BKA.db.showNameplates ~= false and BKA.db.clickableNameplateAlerts ~= false
+    local hoverEnabled = not overlay.castSuppressed and self.clickTargetingApplied == true and BKA.db and BKA.db.enabled ~= false and BKA.db.showNameplates ~= false and BKA.db.clickableNameplateAlerts ~= false
     local hovered = hoverEnabled and MouseIsOver(overlay) and true or false
-    overlay.targetScale = hovered and HOVER_SCALE or 1
+    local baseScale = overlay.baseScale or 1
+    overlay.targetScale = baseScale * (hovered and HOVER_SCALE or 1)
     overlay.hovered = hovered
 
     local current = overlay.currentScale or 1
@@ -483,7 +531,7 @@ function Nameplates:UpdateHoverVisual(overlay, elapsed)
     local color = overlay.baseColor or BKA.colors.LOW
     local t = 0
     if HOVER_SCALE > 1 then
-        t = math.max(0, math.min(1, (current - 1) / (HOVER_SCALE - 1)))
+        t = math.max(0, math.min(1, (current / baseScale - 1) / (HOVER_SCALE - 1)))
     end
     local multiplier = 0.13 + 0.07 * t
     local alpha = 0.94 + 0.06 * t
@@ -506,6 +554,8 @@ function Nameplates:GetOverlay(unit)
             overlay.icon:SetDesaturated(false)
             overlay.circle.icon:SetDesaturated(false)
             overlay.square.icon:SetDesaturated(false)
+            overlay.baseScale = 1
+            overlay.castSuppressed = false
             resetHoverVisual(overlay)
         end
         return overlay
@@ -532,6 +582,8 @@ function Nameplates:GetOverlay(unit)
     overlay.activeState = nil
     overlay.predictionState = nil
     overlay:SetScript("OnUpdate", nil)
+    overlay.baseScale = 1
+    overlay.castSuppressed = false
     resetHoverVisual(overlay)
     self.overlays[unit] = overlay
     return overlay
@@ -557,8 +609,11 @@ function Nameplates:Render(unit)
         overlay.icon:SetDesaturated(false)
         overlay.circle.icon:SetDesaturated(false)
         overlay.square.icon:SetDesaturated(false)
+        overlay.baseScale = 1
+        overlay.castSuppressed = false
         resetHoverVisual(overlay)
         overlay:Hide()
+        self:RefreshCastVisibility()
         return
     end
     local state = overlay.activeState or overlay.temporaryState or overlay.predictionState or overlay.persistentState
@@ -574,9 +629,12 @@ function Nameplates:Render(unit)
         overlay.icon:SetDesaturated(false)
         overlay.circle.icon:SetDesaturated(false)
         overlay.square.icon:SetDesaturated(false)
+        overlay.baseScale = 1
+        overlay.castSuppressed = false
         resetHoverVisual(overlay)
         updateInfestedMarkerAnchor(overlay, false)
         overlay:Hide()
+        self:RefreshCastVisibility()
         return
     end
     if state.prediction and state.predictionData then
@@ -612,6 +670,7 @@ function Nameplates:Render(unit)
     overlay.label:SetTextColor(color[1], color[2], color[3])
     overlay.detail:SetTextColor(1, state.frontalTracking and 0.62 or 0.82, state.frontalTracking and 0.18 or 0.82)
     overlay.baseColor = color
+    overlay.baseScale = self:GetCastScale(state)
     resetHoverVisual(overlay)
     overlay.countdown:SetText("")
     local personal = state == overlay.activeState and state.isPlayer and state.targetConfidence == "CONFIRMED"
@@ -630,6 +689,7 @@ function Nameplates:Render(unit)
     end
     overlay:Show()
     updateInfestedMarkerAnchor(overlay, true)
+    self:RefreshCastVisibility()
     overlay:SetScript("OnUpdate", function(_, elapsed)
         Nameplates:UpdateHoverVisual(overlay, elapsed)
         local current = overlay.activeState or overlay.temporaryState or overlay.predictionState or overlay.persistentState
@@ -799,6 +859,8 @@ function Nameplates:ShowActive(cast, resolution, unit)
         controlAction = resolution.controlAction or (resolution.ability and resolution.ability.ccCapable and "CC" or nil),
         startTime = cast.startTime, endTime = cast.endTime, castGUID = cast.castGUID,
         castIdentity = cast.identity,
+        notInterruptible = cast.notInterruptible,
+        interruptibilityKnown = cast.interruptibilityKnown,
         generation = cast.generation,
         isPlayer = personal,
         targetConfidence = cast.targetConfidence,
@@ -885,6 +947,8 @@ function Nameplates:OnRemoved(unit)
         overlay.icon:SetDesaturated(false)
         overlay.circle.icon:SetDesaturated(false)
         overlay.square.icon:SetDesaturated(false)
+        overlay.baseScale = 1
+        overlay.castSuppressed = false
         resetHoverVisual(overlay)
         if overlay.infestedMarker then
             overlay.infestedMarker:Hide()
@@ -899,6 +963,7 @@ function Nameplates:OnRemoved(unit)
         self.overlays[unit] = nil
         self.freeOverlays[#self.freeOverlays + 1] = overlay
     end
+    self:RefreshCastVisibility()
 end
 
 
@@ -946,6 +1011,8 @@ function Nameplates:Clear()
         overlay.icon:SetDesaturated(false)
         overlay.circle.icon:SetDesaturated(false)
         overlay.square.icon:SetDesaturated(false)
+        overlay.baseScale = 1
+        overlay.castSuppressed = false
         resetHoverVisual(overlay)
         if overlay.infestedMarker then
             overlay.infestedMarker:Hide()

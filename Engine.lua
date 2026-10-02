@@ -765,6 +765,7 @@ function BKA:OnEvent(event, ...)
             if self.Version and self.Version.Initialize then self.Version:Initialize() end
             self.Alerts:Initialize()
             if self.GroupInterrupts and self.GroupInterrupts.Initialize then self.GroupInterrupts:Initialize() end
+            if self.GroupCooldowns then self.GroupCooldowns:Initialize() end
             if self.KeystoneHUD and self.KeystoneHUD.Initialize then self.KeystoneHUD:Initialize() end
             self.Options:Initialize()
             if self.MinimapButton then self.MinimapButton:Initialize() end

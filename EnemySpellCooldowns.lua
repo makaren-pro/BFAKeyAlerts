@@ -267,7 +267,7 @@ local function render(entry, now, cfg)
     local host = intelligence:GetHost(unit)
     if not host or host.ownerGUID ~= entry.guid or not intelligence.GetRows then hidden(entry); return end
 
-    local maxRows = math.max(1, math.min(8, math.floor(numeric(cfg.maxAbilities, 2))))
+    local maxRows = math.max(1, math.min(3, math.floor(numeric(cfg.maxAbilities, 2))))
     local lead = numeric(learningConfig().leadTime, 1)
     local shown = 0
     for _, candidate in ipairs(entry.candidates) do
@@ -278,7 +278,7 @@ local function render(entry, now, cfg)
         hidden(entry)
         return
     end
-    local rows = intelligence:GetRows(host, GROUP_KEY, shown, 22)
+    local rows = intelligence:GetRows(host, GROUP_KEY, shown, 16)
     if type(rows) ~= "table" then hidden(entry); return end
     entry.host, entry.rows, entry.rowCount = host, rows, shown
     local updateText = not entry.textAt or now - entry.textAt >= TEXT_INTERVAL
@@ -289,11 +289,13 @@ local function render(entry, now, cfg)
             index = index + 1
             local row = rows[index]
             if row then
+                if row.text and row.text.SetWidth then row.text:SetWidth(56) end
+                if row.text and row.text.SetWordWrap then row.text:SetWordWrap(false) end
                 if row._enemyCooldownCandidate ~= candidate or row._enemyCooldownHost ~= host or
                     row._enemyCooldownRow ~= row or
                     row._enemyCooldownIndex ~= index then
                     if row.ClearAllPoints then row:ClearAllPoints() end
-                    if row.SetPoint then row:SetPoint("BOTTOMLEFT", host, "BOTTOMLEFT", 0, (index - 1) * 23) end
+                    if row.SetPoint then row:SetPoint("BOTTOMLEFT", host, "BOTTOMLEFT", (index - 1) * 78, 4) end
                     row._enemyCooldownCandidate, row._enemyCooldownHost = candidate, host
                     row._enemyCooldownRow, row._enemyCooldownIndex = row, index
                     setIcon(row, candidate)
@@ -319,6 +321,7 @@ local function render(entry, now, cfg)
         end
     end
     if updateText then entry.textAt = now end
+    if intelligence.LayoutHost then intelligence:LayoutHost(host) end
 end
 
 function Cooldowns:Refresh(now)

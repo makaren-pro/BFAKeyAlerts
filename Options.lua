@@ -5,7 +5,7 @@ BKA.Options = Options
 local WHITE = "Interface\\Buttons\\WHITE8X8"
 local ACCENT = {0.40, 0.88, 0.74}
 local SUPPORT_URL = "https://www.donationalerts.com/r/makarenr"
-local SECTIONS = {"general", "mechanics", "nameplates", "prediction", "intelligence", "kicks", "keystone", "sounds"}
+local SECTIONS = {"general", "mechanics", "nameplates", "prediction", "intelligence", "kicks", "cooldowns", "keystone", "sounds"}
 
 function Options:ShowSupportLink()
     if self.frame then self.frame:Hide() end
@@ -79,7 +79,10 @@ end
 
 local function label(parent, size, x, y, width, value, color)
     local fs = BKA.HUD:Text(parent, size, x, y, width)
-    fs:SetFont(STANDARD_TEXT_FONT, size)
+    local displaySize = size == 10 and 11 or size == 12 and 13 or size
+    fs:SetFont(STANDARD_TEXT_FONT, displaySize)
+    fs:SetShadowColor(0, 0, 0, 1)
+    fs:SetShadowOffset(1, -1)
     fs:SetText(value or "")
     fs:SetWordWrap(true)
     if color then fs:SetTextColor(unpack(color)) end
@@ -94,6 +97,29 @@ local function panel(parent, x, y, width, height, alpha)
     return f
 end
 
+local function updateButtonVisual(b)
+    local bg, border, text
+    if b.isToggle then
+        if b.isOn then
+            bg, border, text = {0.08,0.22,0.20,0.98}, {0.36,0.78,0.63,1}, {0.55,1,0.82}
+        else
+            bg, border, text = {0.055,0.075,0.10,0.92}, {0.24,0.34,0.40,1}, {0.68,0.74,0.79}
+        end
+    elseif b.selected then
+        bg, border, text = {0.08,0.20,0.21,0.98}, {0.39,0.76,0.65,1}, ACCENT
+    else
+        bg, border, text = {0.055,0.09,0.12,0.94}, {0.20,0.38,0.44,1}, {0.90,0.94,0.98}
+    end
+    if b.isDown then
+        bg, border = {0.035,0.13,0.15,1}, {0.46,0.91,0.76,1}
+    elseif b.hovered then
+        bg, border = {0.10,0.20,0.22,1}, {0.35,0.65,0.62,1}
+    end
+    b:SetBackdropColor(unpack(bg))
+    b:SetBackdropBorderColor(unpack(border))
+    b.text:SetTextColor(unpack(text))
+end
+
 local function button(parent, title, x, y, width, height, callback)
     local b = CreateFrame("Button", nil, parent)
     b:SetPoint("TOPLEFT", x, y)
@@ -102,14 +128,18 @@ local function button(parent, title, x, y, width, height, callback)
     b:RegisterForClicks("LeftButtonUp")
     b:SetHitRectInsets(0, 0, 0, 0)
     style(b, 0.84)
+    b:SetBackdrop({bgFile=WHITE,edgeFile=WHITE,edgeSize=1,insets={left=1,right=1,top=1,bottom=1}})
     b.text = label(b, 11, 0, 0, width, title)
     b.text:ClearAllPoints()
     b.text:SetPoint("CENTER")
     b.text:SetJustifyH("CENTER")
-    b.baseColor = {0.025, 0.035, 0.055, 0.84}
-    b:SetScript("OnEnter", function(self) self:SetBackdropColor(0.10, 0.22, 0.25, 0.95) end)
-    b:SetScript("OnLeave", function(self) self:SetBackdropColor(unpack(self.baseColor)) end)
+    b.hovered, b.isDown = false, false
+    b:SetScript("OnEnter", function(self) self.hovered=true; updateButtonVisual(self) end)
+    b:SetScript("OnLeave", function(self) self.hovered=false; self.isDown=false; updateButtonVisual(self) end)
+    b:SetScript("OnMouseDown", function(self) self.isDown=true; updateButtonVisual(self) end)
+    b:SetScript("OnMouseUp", function(self) self.isDown=false; updateButtonVisual(self) end)
     b:SetScript("OnClick", callback)
+    updateButtonVisual(b)
     return b
 end
 
@@ -141,14 +171,23 @@ local function onChanged(path)
         if BKA.Nameplates then BKA.Nameplates:RefreshAll() end
     elseif path == "enabled" then
         BKA:RefreshActivation()
+        if BKA.ChatBubbles then BKA.ChatBubbles:Refresh() end
         if BKA.db.enabled == false and BKA.Alerts then BKA.Alerts:Clear() end
         if BKA.Nameplates then BKA.Nameplates:RefreshAll(); BKA.Nameplates:RefreshClickTargeting() end
         BKA.GroupInterrupts:Refresh(true)
+        if BKA.GroupCooldowns then BKA.GroupCooldowns:Refresh(true) end
         BKA.KeystoneHUD:Refresh(true)
     elseif path == "showAlerts" then
         if BKA.db.showAlerts == false then BKA.Alerts:Clear() end
     elseif path == "showNameplates" then
         if BKA.db.showNameplates == false then BKA.Nameplates:Clear() else BKA.Nameplates:RefreshAll() end
+        BKA.Nameplates:RefreshClickTargeting()
+    elseif path == "hideChatBubblesInKey" then
+        BKA.ChatBubbles:Refresh()
+    elseif path == "hideUninterruptibleDuringKick" then
+        BKA.Nameplates:RefreshCastVisibility()
+    elseif path == "emphasizeInterruptibleCasts" then
+        BKA.Nameplates:RefreshAll()
         BKA.Nameplates:RefreshClickTargeting()
     elseif path == "clickableNameplateAlerts" then
         BKA.Nameplates:RefreshClickTargeting()
@@ -156,6 +195,9 @@ local function onChanged(path)
         refreshCombat(true)
     elseif path == "showFrontalTarget" then
         refreshCombat(false)
+    elseif string.match(path, "^healerHUD%.") or string.match(path, "^tankHUD%.") or string.match(path, "^defensiveHUD%.") then
+        BKA.GroupCooldowns:ApplySettings()
+        BKA.GroupCooldowns:Refresh(true)
     elseif string.match(path, "^kickTracker%.") then
         BKA.GroupInterrupts:ApplySettings()
         BKA.GroupInterrupts:Refresh(true)
@@ -193,19 +235,21 @@ local function toggle(p, path, titleKey, descKey, height, warning)
     height = height or 58
     local row = panel(p.child, 12, p.y, 580, height, 0.47)
     label(row, 12, 12, -10, 410, BKA:L(titleKey))
-    if descKey then label(row, 10, 12, -29, 420, BKA:L(descKey), {0.62, 0.71, 0.77}) end
+    if descKey then label(row, 10, 12, -29, 420, BKA:L(descKey), {0.76, 0.82, 0.86}) end
     if warning then
-        label(row, 10, 12, -53, 545, BKA:L("OPT_EXPERIMENTAL") .. "  •  " .. BKA:L("OPT_CLICK_WARNING"), {0.98, 0.76, 0.39})
+        label(row, 10, 12, -53, 545, BKA:L("OPT_EXPERIMENTAL") .. "  •  " .. BKA:L(type(warning) == "string" and warning or "OPT_CLICK_WARNING"), {0.98, 0.76, 0.39})
     end
     local control = button(row, "", 470, -15, 94, 28, function()
         set(path, get(path) == false)
         onChanged(path)
     end)
+    control.isToggle = true
     Options.controls[#Options.controls + 1] = function()
         local active = path == "minimap.hide" and get(path) ~= true or
             (path ~= "minimap.hide" and get(path) ~= false)
         control.text:SetText(BKA:L(active and "ON" or "OFF"))
-        control.text:SetTextColor(active and ACCENT[1] or 0.90, active and ACCENT[2] or 0.94, active and ACCENT[3] or 0.98)
+        control.isOn = active
+        updateButtonVisual(control)
     end
     p.y = p.y - height - 7
     return row
@@ -234,7 +278,7 @@ local function slider(p, path, titleKey, minValue, maxValue, step, format)
     Options.controls[#Options.controls + 1] = function()
         s:SetValue(tonumber(get(path)) or minValue)
         local displayed = tonumber(get(path)) or minValue
-        if path == "kickTracker.alpha" or path == "keystoneHUD.backgroundAlpha" or path == "castLearning.minimumConfidence" then displayed = displayed * 100 end
+        if string.match(path, "%.alpha$") or string.match(path, "%.backgroundAlpha$") or path == "castLearning.minimumConfidence" then displayed = displayed * 100 end
         valueText:SetText(string.format(format, displayed))
     end
     p.y = p.y - 59
@@ -279,6 +323,9 @@ local function buildNameplates()
     local p = page("nameplates")
     toggle(p, "showNameplates", "OPT_NAMEPLATES", "OPT_NAMEPLATES_DESC")
     toggle(p, "showFrontalTarget", "OPT_FRONTAL", "OPT_FRONTAL_DESC")
+    toggle(p, "emphasizeInterruptibleCasts", "OPT_KICK_SIZE", "OPT_KICK_SIZE_DESC", 82)
+    toggle(p, "hideUninterruptibleDuringKick", "OPT_KICK_FOCUS", nil, 116, "OPT_KICK_FOCUS_DESC")
+    toggle(p, "hideChatBubblesInKey", "OPT_HIDE_BUBBLES", "OPT_HIDE_BUBBLES_DESC", 82)
     toggle(p, "clickableNameplateAlerts", "OPT_CLICKABLE", nil, 116, true)
 end
 
@@ -295,6 +342,21 @@ local function buildIntelligence()
     label(p.child, 10, 24, p.y, 550, BKA:L("CI_MARK_PRIORITY_DESC")); p.y = p.y - 36
     toggle(p, "autoMarkers.preserveManual", "CI_PRESERVE_MANUAL", "CI_PRESERVE_MANUAL_DESC")
     toggle(p, "partyFrameTargets.enabled", "CI_PARTY", "CI_PARTY_DESC")
+    local previewRow = panel(p.child, 12, p.y, 580, 64, 0.47)
+    label(previewRow, 10, 202, -10, 358, BKA:L("CI_PARTY_PREVIEW_DESC"), {0.76, 0.82, 0.86})
+    local preview = button(previewRow, "", 10, -18, 180, 28, function()
+        if BKA.PartyFrameTargets then
+            BKA.PartyFrameTargets:SetPreview(not BKA.PartyFrameTargets:IsPreviewEnabled())
+        end
+        Options:Refresh()
+    end)
+    Options.controls[#Options.controls + 1] = function()
+        local active = BKA.PartyFrameTargets and BKA.PartyFrameTargets:IsPreviewEnabled() or false
+        preview.isToggle, preview.isOn = true, active
+        preview.text:SetText(BKA:L(active and "CI_PARTY_PREVIEW_OFF" or "CI_PARTY_PREVIEW_ON"))
+        updateButtonVisual(preview)
+    end
+    p.y = p.y - 71
     slider(p, "partyFrameTargets.maxSpells", "CI_MAX_SPELLS", 1, 3, 1, "%d")
     slider(p, "partyFrameTargets.minSeverity", "CI_SEVERITY", 1, 4, 1, "%d")
     slider(p, "partyFrameTargets.iconSize", "CI_ICON_SIZE", 12, 28, 1, "%d px")
@@ -310,7 +372,6 @@ local function buildIntelligence()
     toggle(p, "mobState.purge", "CI_PURGE")
     toggle(p, "castbarIntelligence.enabled", "CI_CASTBAR")
     toggle(p, "castbarIntelligence.interruptTick", "CI_INTERRUPT_TICK")
-    toggle(p, "castbarIntelligence.properties", "CI_PROPERTIES")
 end
 
 local function buildPrediction()
@@ -346,7 +407,7 @@ local function buildPrediction()
         end})
     heading(p, "CP_PREVIEW")
     local preview = panel(p.child, 12, p.y, 580, 147, 0.47)
-    label(preview, 10, 12, -5, 550, BKA:L("OPT_ENEMY"), {0.62, 0.71, 0.77})
+    label(preview, 10, 12, -5, 550, BKA:L("OPT_ENEMY"), {0.76, 0.82, 0.86})
     local ghost = panel(preview, 12, -29, 260, 48, 0.45)
     local real = panel(preview, 294, -29, 270, 48, 0.78)
     ghost:SetAlpha(0.30)
@@ -380,6 +441,27 @@ local function buildKicks()
         {"OPT_RESET_POSITION", function() BKA.GroupInterrupts:ResetPosition(); Options:Refresh() end})
 end
 
+local function buildCooldowns()
+    local p = page("cooldowns")
+    for _, kind in ipairs({"healer", "tank", "defensive"}) do
+        local prefix = kind .. "HUD."
+        local title = kind == "healer" and "GC_HEALER" or kind == "tank" and "GC_TANK" or "GC_DEFENSIVE"
+        heading(p, title)
+        toggle(p, prefix .. "shown", title, "GC_PANEL_DESC")
+        toggle(p, prefix .. "onlyInKey", "OPT_ONLY_IN_KEY", "OPT_ONLY_IN_KEY_DESC")
+        slider(p, prefix .. "scale", "OPT_SCALE", 0.6, 2, 0.05, "%.2fx")
+        slider(p, prefix .. "alpha", "GC_ALPHA", 0.10, 1, 0.05, "%.0f%%")
+        slider(p, prefix .. "backgroundAlpha", "OPT_ALPHA", 0, 1, 0.05, "%.0f%%")
+        slider(p, prefix .. "iconSize", "CI_ICON_SIZE", 20, 56, 2, "%d px")
+        if kind ~= "defensive" then
+            slider(p, prefix .. "columns", "GC_COLUMNS", 1, 10, 1, "%d")
+        end
+        actions(p,
+            {"OPT_LOCK_TOGGLE", function() set(prefix .. "locked", get(prefix .. "locked") == false); onChanged(prefix .. "locked") end},
+            {"OPT_RESET_POSITION", function() BKA.GroupCooldowns:ResetPosition(kind); Options:Refresh() end})
+    end
+end
+
 local function buildKeystone()
     local p = page("keystone")
     toggle(p, "keystoneHUD.shown", "OPT_KEY_HUD", "OPT_KEY_HUD_DESC")
@@ -396,7 +478,7 @@ local function buildSounds()
     local p = page("sounds")
     toggle(p, "sound", "OPT_SOUND", "OPT_SOUND_DESC")
     heading(p, "OPT_PER_ACTION")
-    label(p.child, 10, 16, p.y, 550, BKA:L("OPT_SOUND_HINT"), {0.62, 0.71, 0.77})
+    label(p.child, 10, 16, p.y, 550, BKA:L("OPT_SOUND_HINT"), {0.76, 0.82, 0.86})
     p.y = p.y - 34
     local soundActions = BKA.Sounds:GetActions()
     for i, action in ipairs(soundActions) do
@@ -441,7 +523,7 @@ function Options:Initialize()
     header:SetScript("OnDragStart", function() frame:StartMoving() end)
     header:SetScript("OnDragStop", function() frame:StopMovingOrSizing() end)
     label(frame, 17, 18, -18, 350, BKA:L("ADDON_TITLE"))
-    label(frame, 10, 20, -42, 350, BKA:L("OPT_SUBTITLE"), {0.58, 0.70, 0.76})
+    label(frame, 10, 20, -42, 350, BKA:L("OPT_SUBTITLE"), {0.76, 0.82, 0.86})
     self:AddSupportLink(frame, "TOPRIGHT", "TOPRIGHT", -61, -30, 385)
     local close = button(frame, "×", 806, -11, 32, 30, function() frame:Hide() end)
     close:SetFrameLevel(header:GetFrameLevel() + 1)
@@ -453,11 +535,11 @@ function Options:Initialize()
     self.content:SetSize(630, 465)
     self.nav = {}
     for i, section in ipairs(SECTIONS) do
-        local nav = button(frame, BKA:L("OPT_" .. string.upper(section)), 12, -74 - (i - 1) * 48, 160, 37, function() Options:ShowSection(section) end)
+        local nav = button(frame, BKA:L("OPT_" .. string.upper(section)), 12, -74 - (i - 1) * 44, 160, 35, function() Options:ShowSection(section) end)
         self.nav[section] = nav
     end
     self.frame = frame
-    buildGeneral(); buildMechanics(); buildNameplates(); buildPrediction(); buildIntelligence(); buildKicks(); buildKeystone(); buildSounds()
+    buildGeneral(); buildMechanics(); buildNameplates(); buildPrediction(); buildIntelligence(); buildKicks(); buildCooldowns(); buildKeystone(); buildSounds()
     for _, item in pairs(self.pages) do
         item.child:SetHeight(math.max(465, -item.y + 16))
     end
@@ -474,9 +556,8 @@ function Options:ShowSection(section)
     self.section = section
     for key, item in pairs(self.pages) do item.scroll:SetShown(key == section) end
     for key, nav in pairs(self.nav) do
-        nav.baseColor = key == section and {0.10, 0.22, 0.25, 0.95} or {0.025, 0.035, 0.055, 0.84}
-        nav:SetBackdropColor(unpack(nav.baseColor))
-        nav.text:SetTextColor(key == section and ACCENT[1] or 0.90, key == section and ACCENT[2] or 0.94, key == section and ACCENT[3] or 0.98)
+        nav.selected = key == section
+        updateButtonVisual(nav)
     end
     self:Refresh()
 end
